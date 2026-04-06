@@ -2,12 +2,13 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, FileText, Database, Settings } from 'lucide-react';
+import { LayoutDashboard, FileText, Database, Settings, Search } from 'lucide-react';
 import { Logo } from './Logo';
 
 const navItems = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Дашборд' },
   { href: '/tender/new', icon: FileText, label: 'Тендеры' },
+  { href: '/tenders/search', icon: Search, label: 'Поиск тендеров' },
   { href: '/knowledge', icon: Database, label: 'База знаний' },
   { href: '/settings', icon: Settings, label: 'Настройки' },
 ];
@@ -17,7 +18,7 @@ export function Sidebar() {
 
   const isActive = (href: string) => {
     if (href === '/dashboard') return pathname === '/dashboard';
-    if (href === '/tender/new') return pathname.startsWith('/tender');
+    if (href === '/tender/new') return pathname.startsWith('/tender/');
     return pathname.startsWith(href);
   };
 
