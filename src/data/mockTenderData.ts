@@ -1,10 +1,10 @@
 import type { TenderRow, FormField, KnowledgeFile } from '@/types/tender';
 
 export const mockTenders: TenderRow[] = [
-  { id: 1, number: '#2024-МЗ-4471', customer: 'ГКБ им. Боткина', date: '02.04.2026', status: 'review' },
-  { id: 2, number: '#2024-МЗ-4385', customer: 'ГП №62', date: '28.03.2026', status: 'done' },
-  { id: 3, number: '#2024-МЗ-4290', customer: 'ФГБУ НМИЦ', date: '21.03.2026', status: 'done' },
-  { id: 4, number: '#2024-ИТ-1102', customer: 'Мосгорздрав', date: '15.03.2026', status: 'done' },
+  { id: 1, number: 'KZ-2026-МЗ-44182', customer: 'ГКП «Поликлиника №4»', date: '02.04.2026', status: 'review' },
+  { id: 2, number: 'KZ-2026-МЗ-44190', customer: 'ГКП «БСМП» Алматы', date: '28.03.2026', status: 'done' },
+  { id: 3, number: 'KZ-2026-МЗ-44236', customer: 'ГКП «ЦРБ» Тараз', date: '21.03.2026', status: 'done' },
+  { id: 4, number: 'KZ-2026-МЗ-44228', customer: 'ГКП «ГБ» Актау', date: '15.03.2026', status: 'processing' },
 ];
 
 export const mockFormFields: FormField[] = [
@@ -101,13 +101,13 @@ export const mockFormFields: FormField[] = [
   },
   {
     id: 9,
-    param: 'Рег. удостоверение',
-    value: 'РЗН 2019/8834',
+    param: 'Сертификат CT-KZ',
+    value: 'СТ-KZ 2023/1847',
     status: 'exact',
-    constraint: 'Росздравнадзор',
-    tz: 'Наличие действующего регистрационного удостоверения Росздравнадзора',
-    source: 'Регистрационное удостоверение: **РЗН 2019/8834**, срок действия — бессрочно',
-    sourceFile: 'Mindray_DC-70_RegCert.pdf, стр. 1',
+    constraint: 'Обязательно',
+    tz: 'Наличие сертификата происхождения CT-KZ или РК для допуска к закупке',
+    source: 'Сертификат CT-KZ: **СТ-KZ 2023/1847**, действителен до 2026 года',
+    sourceFile: 'Mindray_DC-70_CertKZ.pdf, стр. 1',
   },
   {
     id: 10,
@@ -156,17 +156,17 @@ export const mockFormFields: FormField[] = [
     status: 'exact',
     constraint: '≥ 2023',
     tz: 'Год выпуска оборудования — не ранее 2023 года',
-    source: 'Дата производства партии: **2024 Q2**. Серийные номера: DC70-RU-2024XXXX',
+    source: 'Дата производства партии: **2024 Q2**. Серийные номера: DC70-KZ-2024XXXX',
     sourceFile: 'Прайс-лист_Mindray_2024.xlsx, строка 47',
   },
   {
     id: 15,
     param: 'Цена за ед.',
-    value: '4 850 000 ₽',
+    value: '4 750 000 ₸',
     status: 'exact',
-    constraint: '≤ 5 200 000 ₽',
-    tz: 'Начальная максимальная цена контракта: 5 200 000 руб. за единицу оборудования',
-    source: 'Цена DC-70 (комплектация Pro+, 3 датчика): **4 850 000 руб.** (с НДС)',
+    constraint: '≤ 4 800 000 ₸',
+    tz: 'Начальная максимальная цена контракта: 4 800 000 тенге за единицу оборудования',
+    source: 'Цена DC-70 (комплектация Pro+, 3 датчика): **4 750 000 ₸** (с НДС)',
     sourceFile: 'Прайс-лист_Mindray_2024.xlsx, строка 47',
   },
 ];
@@ -175,6 +175,7 @@ export const mockKnowledgeFiles: KnowledgeFile[] = [
   { id: 1, name: 'Mindray_DC-70_Manual_RU.pdf', type: 'pdf', meta: '312 стр.', status: 'processed' },
   { id: 2, name: 'Mindray_DC-70_Specs.pdf', type: 'pdf', meta: '54 стр.', status: 'processed' },
   { id: 3, name: 'Mindray_Warranty_Policy.pdf', type: 'pdf', meta: '8 стр.', status: 'processed' },
-  { id: 4, name: 'Прайс-лист_Mindray_2024.xlsx', type: 'xlsx', meta: '248 позиций', status: 'processed' },
-  { id: 5, name: 'Выгрузка_1С_Номенклатура.xlsx', type: 'xlsx', meta: '1 340 позиций', status: 'processed' },
+  { id: 4, name: 'Mindray_DC-70_CertKZ.pdf', type: 'pdf', meta: '3 стр.', status: 'processed' },
+  { id: 5, name: 'Прайс-лист_Mindray_2024.xlsx', type: 'xlsx', meta: '248 позиций', status: 'processed' },
+  { id: 6, name: 'Выгрузка_1С_Номенклатура.xlsx', type: 'xlsx', meta: '1 340 позиций', status: 'processed' },
 ];

@@ -9,19 +9,37 @@ interface FileItemProps {
 
 export function FileItem({ name, type, meta, showStatus = false }: FileItemProps) {
   return (
-    <div className="flex items-center gap-3 py-3 border-b border-[#E5E7EB] last:border-b-0">
-      <div className={`flex-shrink-0 w-8 h-8 rounded-[6px] flex items-center justify-center ${type === 'pdf' ? 'bg-[#FDEAEA]' : 'bg-[#F0F7E6]'}`}>
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 12,
+      padding: '12px 16px',
+      borderBottom: '1px solid rgba(30,41,59,0.6)',
+      background: '#0F1629',
+    }}
+    className="file-item-row"
+    >
+      <div style={{
+        flexShrink: 0, width: 34, height: 34, borderRadius: 8,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: type === 'pdf' ? 'rgba(239,68,68,0.15)' : 'rgba(16,185,129,0.15)',
+      }}>
         {type === 'pdf'
-          ? <FileText size={16} className="text-[#E24B4A]" />
-          : <FileSpreadsheet size={16} className="text-[#639922]" />
+          ? <FileText size={16} color="#F87171" strokeWidth={1.5} />
+          : <FileSpreadsheet size={16} color="#34D399" strokeWidth={1.5} />
         }
       </div>
-      <div className="flex-1 min-w-0">
-        <div className="text-[13px] font-medium text-[#111827] truncate">{name}</div>
-        <div className="text-[11px] text-[#6B7280]">{meta}</div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 500, color: '#F1F5F9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {name}
+        </div>
+        <div style={{ fontSize: 11, color: '#64748B', marginTop: 1 }}>{meta}</div>
       </div>
       {showStatus && (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-[20px] text-xs font-medium bg-[#F0F7E6] text-[#639922] border border-[#C6E397]">
+        <span style={{
+          display: 'inline-flex', alignItems: 'center',
+          padding: '2px 10px', borderRadius: 20,
+          fontSize: 11, fontWeight: 500,
+          background: 'rgba(16,185,129,0.15)', color: '#34D399',
+        }}>
           Обработан
         </span>
       )}

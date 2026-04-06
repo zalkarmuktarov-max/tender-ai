@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { FileText, Database, Download, CheckCircle, AlertTriangle, XCircle } from 'lucide-react';
 import { Sidebar } from '@/components/Sidebar';
 import { FieldStatusBadge } from '@/components/StatusBadge';
@@ -8,40 +8,37 @@ import { mockFormFields } from '@/data/mockTenderData';
 import type { FormField } from '@/types/tender';
 
 const statusDot: Record<FormField['status'], string> = {
-  exact: 'bg-[#639922]',
-  inferred: 'bg-[#EF9F27]',
-  not_found: 'bg-[#E24B4A]',
+  exact: '#34D399',
+  inferred: '#FBBF24',
+  not_found: '#F87171',
 };
 
 const rowBg: Record<FormField['status'], string> = {
-  exact: '',
-  inferred: 'bg-[#FFFBF2]',
-  not_found: 'bg-[#FEF6F6]',
+  exact: 'transparent',
+  inferred: 'rgba(245,158,11,0.04)',
+  not_found: 'rgba(239,68,68,0.04)',
 };
 
 function renderSourceText(text: string, highlight?: string) {
   if (!highlight || !text.includes(highlight)) {
     const parts = text.split(/\*\*(.+?)\*\*/g);
     return parts.map((part, i) =>
-      i % 2 === 1 ? <strong key={i}>{part}</strong> : part
+      i % 2 === 1 ? <strong key={i} style={{ color: '#F1F5F9' }}>{part}</strong> : part
     );
   }
-
   const idx = text.indexOf(highlight);
   const before = text.slice(0, idx);
   const after = text.slice(idx + highlight.length);
-
   const renderParts = (str: string) => {
     const parts = str.split(/\*\*(.+?)\*\*/g);
     return parts.map((part, i) =>
-      i % 2 === 1 ? <strong key={i}>{part}</strong> : part
+      i % 2 === 1 ? <strong key={i} style={{ color: '#F1F5F9' }}>{part}</strong> : part
     );
   };
-
   return (
     <>
       {renderParts(before)}
-      <mark className="bg-[#FEF3C7] text-[#111827] px-0.5 rounded">{highlight}</mark>
+      <mark style={{ background: 'rgba(245,158,11,0.2)', color: '#CBD5E1', padding: '1px 4px', borderRadius: 3 }}>{highlight}</mark>
       {renderParts(after)}
     </>
   );
@@ -64,94 +61,112 @@ export function TenderForm({ tenderId }: TenderFormProps) {
   const handleSelectRow = (id: number) => {
     setSelectedId(id);
     const el = tzRefs.current[id];
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   };
 
-  const isTenderNumeric = !isNaN(Number(tenderId));
-  const tenderLabel = isTenderNumeric && tenderId === '1'
-    ? '#2024-МЗ-4471'
-    : tenderId === 'demo'
-    ? '#2024-МЗ-4471'
+  const tenderLabel = tenderId === 'demo' || tenderId === '1'
+    ? 'KZ-2026-МЗ-44182'
     : `#${tenderId}`;
 
   return (
-    <div className="flex min-h-screen">
+    <div style={{ display: 'flex', minHeight: '100vh', background: '#0B0F1A' }}>
       <Sidebar />
-      <div className="flex-1 ml-[60px] flex flex-col min-w-0">
+      <div style={{ flex: 1, marginLeft: 210, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         {/* Top bar */}
-        <header className="h-14 bg-white border-b border-[#E5E7EB] flex items-center px-5 justify-between flex-shrink-0">
+        <header style={{
+          height: 56,
+          background: '#0F1629',
+          borderBottom: '1px solid #1E293B',
+          display: 'flex', alignItems: 'center',
+          padding: '0 18px',
+          justifyContent: 'space-between',
+          flexShrink: 0,
+        }}>
           <div>
-            <div className="text-[14px] font-semibold text-[#111827]">
-              Tender {tenderLabel} — УЗИ-аппарат
+            <div style={{ fontSize: 14, fontWeight: 500, color: '#F1F5F9' }}>
+              {tenderLabel} — УЗИ-аппарат
             </div>
-            <div className="text-[11px] text-[#6B7280]">ГБУЗ ГКБ им. Боткина</div>
+            <div style={{ fontSize: 11, color: '#64748B' }}>ГКП «Городская поликлиника №4» г. Астана</div>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5">
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-[20px] text-[11px] font-medium bg-[#F0F7E6] text-[#639922] border border-[#C6E397]">
-                <CheckCircle size={11} />
-                {exactCount} ok
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 500, background: 'rgba(16,185,129,0.15)', color: '#34D399' }}>
+                <CheckCircle size={11} />{exactCount} ok
               </span>
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-[20px] text-[11px] font-medium bg-[#FEF6E7] text-[#B07000] border border-[#F7D68A]">
-                <AlertTriangle size={11} />
-                {inferredCount} проверить
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 500, background: 'rgba(245,158,11,0.15)', color: '#FBBF24' }}>
+                <AlertTriangle size={11} />{inferredCount} проверить
               </span>
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-[20px] text-[11px] font-medium bg-[#FDEAEA] text-[#C0392B] border border-[#F5B0B0]">
-                <XCircle size={11} />
-                {notFoundCount} не найдено
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 500, background: 'rgba(239,68,68,0.15)', color: '#F87171' }}>
+                <XCircle size={11} />{notFoundCount} не найдено
               </span>
             </div>
-            <button className="flex items-center gap-1.5 h-8 px-3 bg-[#534AB7] text-white text-[12px] font-medium rounded-[6px] hover:bg-[#4840A3] transition-colors">
-              <Download size={13} />
+            <button style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              height: 34, padding: '0 14px',
+              background: 'linear-gradient(135deg, #6366F1, #7C3AED)',
+              color: '#ffffff', fontSize: 12, fontWeight: 500,
+              border: 'none', borderRadius: 8,
+              cursor: 'pointer',
+              boxShadow: '0 0 12px rgba(99,102,241,0.2)',
+            }}>
+              <Download size={13} strokeWidth={1.5} />
               Экспорт .xlsx
             </button>
           </div>
         </header>
 
         {/* Three panels */}
-        <div className="flex-1 grid overflow-hidden" style={{ gridTemplateColumns: '1fr 1.5fr 1fr' }}>
+        <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1.5fr 1fr', overflow: 'hidden' }}>
 
-          {/* Left panel — ТЗ */}
-          <div className="border-r border-[#E5E7EB] flex flex-col overflow-hidden">
-            <div className="flex items-center gap-2 px-4 py-3 border-b border-[#E5E7EB] bg-white flex-shrink-0">
-              <FileText size={14} className="text-[#6B7280]" />
-              <span className="text-[12px] font-semibold text-[#111827]">ТЗ заказчика</span>
+          {/* Left: ТЗ */}
+          <div style={{ borderRight: '1px solid #1E293B', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', borderBottom: '1px solid #1E293B', background: 'rgba(15,22,41,0.8)', flexShrink: 0 }}>
+              <FileText size={13} color="#64748B" strokeWidth={1.5} />
+              <span style={{ fontSize: 10, fontWeight: 500, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>ТЗ заказчика</span>
             </div>
-            <div className="flex-1 overflow-y-auto p-3">
+            <div style={{ flex: 1, overflowY: 'auto', padding: 8 }}>
               {mockFormFields.map((field) => (
                 <div
                   key={field.id}
                   ref={(el) => { tzRefs.current[field.id] = el; }}
                   onClick={() => handleSelectRow(field.id)}
-                  className={`p-3 rounded-[6px] mb-1.5 cursor-pointer transition-colors text-[12px] leading-relaxed ${
-                    selectedId === field.id
-                      ? 'border border-[#534AB7] bg-[#EEF0FB]'
-                      : 'border border-transparent hover:bg-[#F9FAFB]'
-                  }`}
+                  style={{
+                    padding: '8px 10px',
+                    borderRadius: 6,
+                    marginBottom: 4,
+                    cursor: 'pointer',
+                    fontSize: 12, lineHeight: 1.5,
+                    transition: 'all 0.15s',
+                    background: selectedId === field.id ? 'rgba(99,102,241,0.15)' : 'transparent',
+                    borderLeft: selectedId === field.id ? '3px solid #6366F1' : '3px solid transparent',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (selectedId !== field.id) (e.currentTarget as HTMLElement).style.background = 'rgba(99,102,241,0.04)';
+                  }}
+                  onMouseLeave={(e) => {
+                    if (selectedId !== field.id) (e.currentTarget as HTMLElement).style.background = 'transparent';
+                  }}
                 >
-                  <span className="font-medium text-[#534AB7] mr-1.5">{field.id + 1}.</span>
-                  <span className="text-[#374151]">{field.tz}</span>
+                  <span style={{ fontWeight: 500, color: '#A5B4FC', marginRight: 6 }}>{field.id + 1}.</span>
+                  <span style={{ color: '#CBD5E1' }}>{field.tz}</span>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Center panel — Форма 2 */}
-          <div className="border-r border-[#E5E7EB] flex flex-col overflow-hidden">
-            <div className="flex items-center gap-2 px-4 py-3 border-b border-[#E5E7EB] bg-white flex-shrink-0">
-              <FileText size={14} className="text-[#6B7280]" />
-              <span className="text-[12px] font-semibold text-[#111827]">Форма 2</span>
+          {/* Center: Форма 2 */}
+          <div style={{ borderRight: '1px solid #1E293B', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', borderBottom: '1px solid #1E293B', background: 'rgba(15,22,41,0.8)', flexShrink: 0 }}>
+              <FileText size={13} color="#64748B" strokeWidth={1.5} />
+              <span style={{ fontSize: 10, fontWeight: 500, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Форма 2</span>
             </div>
-            <div className="flex-1 overflow-auto">
-              <table className="w-full text-[12px]">
-                <thead className="sticky top-0 bg-[#F9FAFB] z-10">
-                  <tr className="border-b border-[#E5E7EB]">
-                    <th className="text-left font-medium text-[#6B7280] px-3 py-2.5 w-[130px]">Параметр</th>
-                    <th className="text-left font-medium text-[#6B7280] px-3 py-2.5">Значение</th>
-                    <th className="text-left font-medium text-[#6B7280] px-3 py-2.5 w-[100px]">Статус</th>
-                    <th className="text-left font-medium text-[#6B7280] px-3 py-2.5 w-[100px]">Ограничение</th>
+            <div style={{ flex: 1, overflow: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
+                  <tr style={{ background: '#0F1629' }}>
+                    {['Параметр', 'Значение', 'Статус', 'Ограничение'].map((h) => (
+                      <th key={h} style={{ textAlign: 'left', fontSize: 10, fontWeight: 500, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px', padding: '9px 12px', borderBottom: '1px solid #1E293B' }}>{h}</th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
@@ -159,23 +174,32 @@ export function TenderForm({ tenderId }: TenderFormProps) {
                     <tr
                       key={field.id}
                       onClick={() => handleSelectRow(field.id)}
-                      className={`border-b border-[#E5E7EB] cursor-pointer transition-colors ${rowBg[field.status]} ${
-                        selectedId === field.id ? 'ring-1 ring-inset ring-[#534AB7]' : 'hover:bg-[#F9FAFB]'
-                      }`}
+                      style={{
+                        cursor: 'pointer',
+                        background: selectedId === field.id ? 'rgba(99,102,241,0.15)' : rowBg[field.status],
+                        borderBottom: '1px solid rgba(30,41,59,0.6)',
+                        transition: 'background 0.15s',
+                        outline: selectedId === field.id ? '1px solid rgba(99,102,241,0.4)' : 'none',
+                        outlineOffset: -1,
+                      }}
+                      onMouseEnter={(e) => {
+                        if (selectedId !== field.id) (e.currentTarget as HTMLElement).style.background = 'rgba(99,102,241,0.04)';
+                      }}
+                      onMouseLeave={(e) => {
+                        if (selectedId !== field.id) (e.currentTarget as HTMLElement).style.background = rowBg[field.status];
+                      }}
                     >
-                      <td className="px-3 py-2.5 font-medium text-[#111827]">{field.param}</td>
-                      <td className="px-3 py-2.5">
-                        <div className="flex items-center gap-1.5">
-                          <div className={`w-2 h-2 rounded-full flex-shrink-0 ${statusDot[field.status]}`} />
-                          <span className={field.status === 'not_found' ? 'text-[#9CA3AF] italic' : 'text-[#111827]'}>
+                      <td style={{ padding: '9px 12px', fontWeight: 500, color: '#CBD5E1' }}>{field.param}</td>
+                      <td style={{ padding: '9px 12px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <div style={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0, background: statusDot[field.status] }} />
+                          <span style={{ color: field.status === 'not_found' ? '#475569' : '#CBD5E1', fontStyle: field.status === 'not_found' ? 'italic' : 'normal' }}>
                             {field.value}
                           </span>
                         </div>
                       </td>
-                      <td className="px-3 py-2.5">
-                        <FieldStatusBadge status={field.status} />
-                      </td>
-                      <td className="px-3 py-2.5 text-[#6B7280]">{field.constraint}</td>
+                      <td style={{ padding: '9px 12px' }}><FieldStatusBadge status={field.status} /></td>
+                      <td style={{ padding: '9px 12px', color: '#64748B' }}>{field.constraint}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -183,50 +207,55 @@ export function TenderForm({ tenderId }: TenderFormProps) {
             </div>
           </div>
 
-          {/* Right panel — Источник */}
-          <div className="flex flex-col overflow-hidden">
-            <div className="flex items-center gap-2 px-4 py-3 border-b border-[#E5E7EB] bg-white flex-shrink-0">
-              <Database size={14} className="text-[#6B7280]" />
-              <span className="text-[12px] font-semibold text-[#111827]">Источник данных</span>
+          {/* Right: Источник */}
+          <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', borderBottom: '1px solid #1E293B', background: 'rgba(15,22,41,0.8)', flexShrink: 0 }}>
+              <Database size={13} color="#64748B" strokeWidth={1.5} />
+              <span style={{ fontSize: 10, fontWeight: 500, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Источник данных</span>
             </div>
-            <div className="flex-1 overflow-y-auto p-4">
+            <div style={{ flex: 1, overflowY: 'auto', padding: 14 }}>
               {selectedField === null ? (
-                <div className="flex items-center justify-center h-full text-[12px] text-[#9CA3AF] text-center">
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontSize: 12, color: '#475569', textAlign: 'center' }}>
                   Выберите строку в таблице
                 </div>
               ) : selectedField.status === 'not_found' ? (
-                <div className="flex flex-col items-center justify-center h-full gap-3 text-center px-4">
-                  <div className="w-10 h-10 rounded-full bg-[#FDEAEA] flex items-center justify-center">
-                    <XCircle size={20} className="text-[#E24B4A]" />
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 12, textAlign: 'center', padding: '0 16px' }}>
+                  <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(239,68,68,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <XCircle size={20} color="#F87171" strokeWidth={1.5} />
                   </div>
                   <div>
-                    <div className="text-[13px] font-medium text-[#111827] mb-1">Данные не найдены</div>
-                    <div className="text-[12px] text-[#6B7280]">
-                      Данные не найдены в базе. Заполните вручную.
-                    </div>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: '#CBD5E1', marginBottom: 4 }}>Данные не найдены</div>
+                    <div style={{ fontSize: 12, color: '#64748B' }}>Данные не найдены в базе. Заполните вручную.</div>
                   </div>
                 </div>
               ) : (
                 <div>
-                  <div className="text-[11px] font-semibold text-[#6B7280] uppercase tracking-wide mb-3">
+                  <div style={{ fontSize: 10, fontWeight: 500, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 10 }}>
                     Извлечённый фрагмент
                   </div>
-                  <div className="bg-[#F9FAFB] border border-[#E5E7EB] rounded-[6px] p-3 text-[12px] text-[#374151] leading-relaxed mb-3">
+                  <div style={{
+                    background: '#0B0F1A',
+                    border: '1px solid #1E293B',
+                    borderLeft: '3px solid #F59E0B',
+                    borderRadius: 8, padding: 12,
+                    fontSize: 12, color: '#CBD5E1', lineHeight: 1.6,
+                    marginBottom: 12,
+                  }}>
                     {renderSourceText(selectedField.source, selectedField.highlight)}
                   </div>
                   {selectedField.sourceFile && (
-                    <div className="flex items-center gap-2 text-[11px] text-[#6B7280]">
-                      <div className="w-6 h-6 bg-[#FDEAEA] rounded-[4px] flex items-center justify-center flex-shrink-0">
-                        <FileText size={12} className="text-[#E24B4A]" />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: '#475569' }}>
+                      <div style={{ width: 22, height: 22, background: 'rgba(239,68,68,0.15)', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <FileText size={12} color="#F87171" strokeWidth={1.5} />
                       </div>
-                      <span className="break-all">{selectedField.sourceFile}</span>
+                      <span style={{ wordBreak: 'break-all' }}>{selectedField.sourceFile}</span>
                     </div>
                   )}
-                  <div className="mt-4 pt-4 border-t border-[#E5E7EB]">
-                    <div className="text-[11px] font-semibold text-[#6B7280] uppercase tracking-wide mb-2">
+                  <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid #1E293B' }}>
+                    <div style={{ fontSize: 10, fontWeight: 500, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>
                       Требование ТЗ
                     </div>
-                    <div className="text-[12px] text-[#374151] leading-relaxed">
+                    <div style={{ fontSize: 12, color: '#CBD5E1', lineHeight: 1.6 }}>
                       {selectedField.tz}
                     </div>
                   </div>

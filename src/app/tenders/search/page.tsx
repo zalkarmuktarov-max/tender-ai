@@ -28,20 +28,37 @@ const TENDERS: Tender[] = [
   { id: 'KZ-2026-МЗ-44244', name: 'Поставка цифрового маммографа для онкоцентр Астана', customer: 'ГКП «Онкоцентр» Астана', budget: '22 500 000 ₸', budgetNum: 22500000, deadline: '02.05.2026', relevance: 28, region: 'Астана', category: 'Медоборудование' },
 ];
 
+const selectStyle: React.CSSProperties = {
+  height: 36,
+  padding: '0 12px',
+  background: '#0B0F1A',
+  border: '1px solid #1E293B',
+  borderRadius: 8,
+  color: '#CBD5E1',
+  fontSize: 13,
+  outline: 'none',
+  cursor: 'pointer',
+};
+
+const inputStyle: React.CSSProperties = {
+  height: 36,
+  padding: '0 12px',
+  background: '#0B0F1A',
+  border: '1px solid #1E293B',
+  borderRadius: 8,
+  color: '#CBD5E1',
+  fontSize: 13,
+  outline: 'none',
+};
+
 function RelevanceBar({ value }: { value: number }) {
-  const color =
-    value > 70 ? '#16A34A' : value >= 30 ? '#CA8A04' : '#9CA3AF';
+  const color = value > 70 ? '#34D399' : value >= 30 ? '#FBBF24' : '#475569';
   return (
-    <div className="flex items-center gap-2">
-      <div className="w-20 h-1.5 bg-[#F3F4F6] rounded-full overflow-hidden">
-        <div
-          className="h-full rounded-full transition-all"
-          style={{ width: `${value}%`, backgroundColor: color }}
-        />
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div style={{ width: 72, height: 6, background: '#1E293B', borderRadius: 3, overflow: 'hidden' }}>
+        <div style={{ height: '100%', width: `${value}%`, background: color, borderRadius: 3, transition: 'width 0.3s' }} />
       </div>
-      <span className="text-[12px] font-medium" style={{ color }}>
-        {value}%
-      </span>
+      <span style={{ fontSize: 12, fontWeight: 500, color, minWidth: 32 }}>{value}%</span>
     </div>
   );
 }
@@ -56,8 +73,7 @@ export default function TendersSearchPage() {
 
   const filtered = useMemo(() => {
     return TENDERS.filter((t) => {
-      const matchQuery =
-        !query ||
+      const matchQuery = !query ||
         t.name.toLowerCase().includes(query.toLowerCase()) ||
         t.id.toLowerCase().includes(query.toLowerCase()) ||
         t.customer.toLowerCase().includes(query.toLowerCase());
@@ -70,68 +86,39 @@ export default function TendersSearchPage() {
     }).sort((a, b) => b.relevance - a.relevance);
   }, [query, category, region, budgetFrom, budgetTo]);
 
-  return (
-    <div className="flex min-h-screen bg-[#F9FAFB]">
-      <Sidebar />
-      <div className="flex-1 ml-[60px] flex flex-col">
-        <header className="h-14 bg-white border-b border-[#E5E7EB] flex items-center px-5 justify-between flex-shrink-0">
-          <span className="text-[14px] font-semibold text-[#111827]">Поиск тендеров</span>
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-full bg-[#534AB7] flex items-center justify-center text-white text-[11px] font-semibold">
-              АИ
-            </div>
-            <span className="text-[13px] text-[#111827]">Администратор</span>
-          </div>
-        </header>
+  const headers = ['Номер закупки', 'Наименование', 'Заказчик', 'Бюджет', 'Дедлайн', 'Релевантность', ''];
 
-        <main className="flex-1 p-6">
-          <h1 className="text-[18px] font-semibold text-[#111827] mb-1">Поиск тендеров</h1>
-          <p className="text-[13px] text-[#6B7280] mb-5">Результаты с портала goszakup.gov.kz, отсортированы по релевантности</p>
+  return (
+    <div style={{ display: 'flex', minHeight: '100vh', background: '#0B0F1A' }}>
+      <Sidebar />
+      <div style={{ flex: 1, marginLeft: 210 }}>
+        <main style={{ padding: '24px 28px' }}>
+          <h1 style={{ fontSize: 22, fontWeight: 500, color: '#F1F5F9', margin: '0 0 4px' }}>Поиск тендеров</h1>
+          <p style={{ fontSize: 12, color: '#64748B', margin: '0 0 20px' }}>
+            Результаты с портала goszakup.gov.kz, отсортированы по релевантности
+          </p>
 
           {/* Filters */}
-          <div className="flex flex-wrap gap-2 mb-5">
-            <div className="relative flex-1 min-w-[220px]">
-              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+            <div style={{ position: 'relative', flex: 1, minWidth: 220 }}>
+              <Search size={14} color="#64748B" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
               <input
                 type="text"
                 placeholder="Поиск по названию, номеру, заказчику…"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                className="w-full h-9 pl-9 pr-3 text-[13px] border border-[#E5E7EB] rounded-[6px] bg-white text-[#111827] placeholder-[#9CA3AF] focus:outline-none focus:border-[#534AB7]"
+                style={{ ...inputStyle, width: '100%', paddingLeft: 32, boxSizing: 'border-box' }}
               />
             </div>
-
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="h-9 px-3 text-[13px] border border-[#E5E7EB] rounded-[6px] bg-white text-[#111827] focus:outline-none focus:border-[#534AB7]"
-            >
+            <select value={category} onChange={(e) => setCategory(e.target.value)} style={selectStyle}>
               <option>Все</option>
               <option>Медоборудование</option>
               <option>IT-оборудование</option>
               <option>Строительство</option>
             </select>
-
-            <input
-              type="text"
-              placeholder="Бюджет от"
-              value={budgetFrom}
-              onChange={(e) => setBudgetFrom(e.target.value)}
-              className="h-9 w-[120px] px-3 text-[13px] border border-[#E5E7EB] rounded-[6px] bg-white text-[#111827] placeholder-[#9CA3AF] focus:outline-none focus:border-[#534AB7]"
-            />
-            <input
-              type="text"
-              placeholder="Бюджет до"
-              value={budgetTo}
-              onChange={(e) => setBudgetTo(e.target.value)}
-              className="h-9 w-[120px] px-3 text-[13px] border border-[#E5E7EB] rounded-[6px] bg-white text-[#111827] placeholder-[#9CA3AF] focus:outline-none focus:border-[#534AB7]"
-            />
-
-            <select
-              value={region}
-              onChange={(e) => setRegion(e.target.value)}
-              className="h-9 px-3 text-[13px] border border-[#E5E7EB] rounded-[6px] bg-white text-[#111827] focus:outline-none focus:border-[#534AB7]"
-            >
+            <input type="text" placeholder="Бюджет от" value={budgetFrom} onChange={(e) => setBudgetFrom(e.target.value)} style={{ ...inputStyle, width: 110 }} />
+            <input type="text" placeholder="Бюджет до" value={budgetTo} onChange={(e) => setBudgetTo(e.target.value)} style={{ ...inputStyle, width: 110 }} />
+            <select value={region} onChange={(e) => setRegion(e.target.value)} style={selectStyle}>
               <option>Все регионы</option>
               <option>Астана</option>
               <option>Алматы</option>
@@ -142,62 +129,80 @@ export default function TendersSearchPage() {
           </div>
 
           {/* Table */}
-          <div className="bg-white border border-[#E5E7EB] rounded-[8px] overflow-hidden">
-            <table className="w-full border-collapse">
+          <div style={{ background: '#0F1629', border: '1px solid #1E293B', borderRadius: 12, overflow: 'hidden' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
-                <tr className="border-b border-[#E5E7EB]">
-                  <th className="text-left text-[11px] font-semibold text-[#6B7280] uppercase tracking-wide px-4 py-3">Номер закупки</th>
-                  <th className="text-left text-[11px] font-semibold text-[#6B7280] uppercase tracking-wide px-4 py-3">Наименование</th>
-                  <th className="text-left text-[11px] font-semibold text-[#6B7280] uppercase tracking-wide px-4 py-3">Заказчик</th>
-                  <th className="text-left text-[11px] font-semibold text-[#6B7280] uppercase tracking-wide px-4 py-3">Бюджет</th>
-                  <th className="text-left text-[11px] font-semibold text-[#6B7280] uppercase tracking-wide px-4 py-3">Дедлайн</th>
-                  <th className="text-left text-[11px] font-semibold text-[#6B7280] uppercase tracking-wide px-4 py-3">Релевантность</th>
-                  <th className="px-4 py-3" />
+                <tr>
+                  {headers.map((h) => (
+                    <th key={h} style={{
+                      textAlign: 'left', fontSize: 10, fontWeight: 500,
+                      color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px',
+                      padding: '10px 14px', borderBottom: '1px solid #1E293B',
+                    }}>{h}</th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
                 {filtered.length === 0 && (
-                  <tr>
-                    <td colSpan={7} className="text-center text-[13px] text-[#9CA3AF] py-12">
-                      Тендеры не найдены
-                    </td>
-                  </tr>
+                  <tr><td colSpan={7} style={{ textAlign: 'center', fontSize: 13, color: '#475569', padding: '48px 0' }}>Тендеры не найдены</td></tr>
                 )}
                 {filtered.map((tender) => {
                   const highlight = tender.relevance > 70;
                   return (
                     <tr
                       key={tender.id}
-                      className={`border-b border-[#E5E7EB] last:border-b-0 transition-colors hover:brightness-[0.97] ${
-                        highlight ? 'bg-[#F0FDF4]' : 'bg-white'
-                      }`}
+                      style={{
+                        background: highlight ? 'rgba(16,185,129,0.04)' : 'transparent',
+                        borderBottom: '1px solid rgba(30,41,59,0.6)',
+                        transition: 'background 0.15s',
+                      }}
+                      onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = 'rgba(99,102,241,0.04)')}
+                      onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = highlight ? 'rgba(16,185,129,0.04)' : 'transparent')}
                     >
-                      <td className="px-4 py-3 text-[12px] font-mono text-[#534AB7] whitespace-nowrap">
+                      <td style={{ padding: '10px 14px', fontSize: 11, fontFamily: 'monospace', color: '#A5B4FC', whiteSpace: 'nowrap' }}>
                         {tender.id}
                       </td>
-                      <td className="px-4 py-3 text-[13px] text-[#111827] max-w-[300px]">
-                        <span className="line-clamp-2">{tender.name}</span>
+                      <td style={{ padding: '10px 14px', fontSize: 12, color: '#CBD5E1', maxWidth: 260 }}>
+                        <span style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                          {tender.name}
+                        </span>
                       </td>
-                      <td className="px-4 py-3 text-[12px] text-[#6B7280] max-w-[180px]">
-                        <span className="line-clamp-2">{tender.customer}</span>
+                      <td style={{ padding: '10px 14px', fontSize: 12, color: '#64748B', maxWidth: 160 }}>
+                        <span style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                          {tender.customer}
+                        </span>
                       </td>
-                      <td className="px-4 py-3 text-[13px] font-medium text-[#111827] whitespace-nowrap">
+                      <td style={{ padding: '10px 14px', fontSize: 13, fontWeight: 500, color: '#A5B4FC', whiteSpace: 'nowrap' }}>
                         {tender.budget}
                       </td>
-                      <td className="px-4 py-3 text-[12px] text-[#6B7280] whitespace-nowrap">
+                      <td style={{ padding: '10px 14px', fontSize: 12, color: '#64748B', whiteSpace: 'nowrap' }}>
                         {tender.deadline}
                       </td>
-                      <td className="px-4 py-3">
+                      <td style={{ padding: '10px 14px' }}>
                         <RelevanceBar value={tender.relevance} />
                       </td>
-                      <td className="px-4 py-3">
+                      <td style={{ padding: '10px 14px' }}>
                         <button
-                          onClick={() =>
-                            router.push(
-                              `/tender/new?name=${encodeURIComponent(tender.name)}`
-                            )
-                          }
-                          className="h-7 px-3 text-[12px] font-medium text-[#534AB7] border border-[#534AB7] rounded-[5px] hover:bg-[#EEF0FB] transition-colors whitespace-nowrap"
+                          onClick={() => router.push(`/tender/new?name=${encodeURIComponent(tender.name)}`)}
+                          style={{
+                            height: 28, padding: '0 10px',
+                            fontSize: 11, fontWeight: 500,
+                            color: '#64748B',
+                            background: 'transparent',
+                            border: '1px solid #1E293B',
+                            borderRadius: 6,
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap',
+                            transition: 'all 0.15s',
+                          }}
+                          onMouseEnter={(e) => {
+                            (e.currentTarget as HTMLElement).style.borderColor = '#6366F1';
+                            (e.currentTarget as HTMLElement).style.color = '#A5B4FC';
+                          }}
+                          onMouseLeave={(e) => {
+                            (e.currentTarget as HTMLElement).style.borderColor = '#1E293B';
+                            (e.currentTarget as HTMLElement).style.color = '#64748B';
+                          }}
                         >
                           Взять в работу
                         </button>
@@ -208,8 +213,7 @@ export default function TendersSearchPage() {
               </tbody>
             </table>
           </div>
-
-          <div className="mt-3 text-[12px] text-[#9CA3AF]">
+          <div style={{ marginTop: 10, fontSize: 12, color: '#475569' }}>
             Показано {filtered.length} из {TENDERS.length} тендеров
           </div>
         </main>

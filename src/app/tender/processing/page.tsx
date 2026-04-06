@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Check, Loader2 } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { Sidebar } from '@/components/Sidebar';
 
 const steps = [
@@ -12,75 +12,113 @@ const steps = [
   { id: 3, label: 'Валидация', sub: 'Ожидание', status: 'waiting' },
 ];
 
+function PulseRing() {
+  return (
+    <div style={{ position: 'relative', width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{
+        position: 'absolute', inset: 0, borderRadius: '50%',
+        background: 'rgba(59,130,246,0.2)',
+        animation: 'pulse 1.5s ease-in-out infinite',
+      }} />
+      <div style={{
+        width: 8, height: 8, borderRadius: '50%',
+        background: '#60A5FA',
+        position: 'relative', zIndex: 1,
+      }} />
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { transform: scale(1); opacity: 0.6; }
+          50% { transform: scale(1.4); opacity: 0; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
 export default function ProcessingPage() {
   const router = useRouter();
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      router.push('/tender/demo');
+      router.push('/tender/audit');
     }, 3000);
     return () => clearTimeout(timer);
   }, [router]);
 
   return (
-    <div className="flex min-h-screen">
+    <div style={{ display: 'flex', minHeight: '100vh', background: '#0B0F1A' }}>
       <Sidebar />
-      <div className="flex-1 ml-[60px] flex flex-col">
-        <header className="h-14 bg-white border-b border-[#E5E7EB] flex items-center px-5 justify-between flex-shrink-0">
-          <span className="text-[14px] font-semibold text-[#111827]">Обработка тендера</span>
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-full bg-[#534AB7] flex items-center justify-center text-white text-[11px] font-semibold">
-              АИ
-            </div>
-            <span className="text-[13px] text-[#111827]">Администратор</span>
-          </div>
-        </header>
+      <div style={{ flex: 1, marginLeft: 210, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ width: 380 }}>
+          <div style={{
+            background: '#0F1629',
+            border: '1px solid #1E293B',
+            borderRadius: 12,
+            padding: '28px 28px 24px',
+          }}>
+            <h1 style={{ fontSize: 16, fontWeight: 500, color: '#F1F5F9', margin: '0 0 4px' }}>
+              KZ-2026-МЗ-44182
+            </h1>
+            <p style={{ fontSize: 12, color: '#64748B', margin: '0 0 28px' }}>
+              УЗИ-аппарат — обработка документов
+            </p>
 
-        <main className="flex-1 flex items-center justify-center">
-          <div className="w-[480px]">
-            <div className="bg-white border border-[#E5E7EB] rounded-[8px] p-8">
-              <h1 className="text-[16px] font-semibold text-[#111827] mb-1">
-                Tender #2024-МЗ-4471
-              </h1>
-              <p className="text-[13px] text-[#6B7280] mb-8">УЗИ-аппарат — обработка документов</p>
+            <div style={{ position: 'relative' }}>
+              {/* Vertical line */}
+              <div style={{
+                position: 'absolute', left: 9, top: 10, bottom: 10,
+                width: 1, background: '#1E293B',
+              }} />
 
-              <div className="relative">
-                <div className="absolute left-[15px] top-0 bottom-0 w-px bg-[#E5E7EB]" />
-                <div className="flex flex-col gap-0">
-                  {steps.map((step, i) => (
-                    <div key={step.id} className="flex items-start gap-4 pb-7 last:pb-0 relative">
-                      <div className={`w-[30px] h-[30px] rounded-full flex items-center justify-center flex-shrink-0 z-10 border-2 ${
-                        step.status === 'done'
-                          ? 'bg-[#639922] border-[#639922]'
-                          : step.status === 'active'
-                          ? 'bg-[#534AB7] border-[#534AB7]'
-                          : 'bg-white border-[#E5E7EB]'
-                      }`}>
-                        {step.status === 'done' && <Check size={14} className="text-white" strokeWidth={2.5} />}
-                        {step.status === 'active' && <Loader2 size={14} className="text-white animate-spin" />}
-                        {step.status === 'waiting' && <div className="w-2 h-2 rounded-full bg-[#D1D5DB]" />}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                {steps.map((step) => (
+                  <div key={step.id} style={{
+                    display: 'flex', alignItems: 'flex-start', gap: 14,
+                    paddingBottom: step.id < steps.length - 1 ? 22 : 0,
+                    position: 'relative',
+                  }}>
+                    {/* Step indicator */}
+                    <div style={{
+                      width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
+                      zIndex: 1, position: 'relative',
+                      background: step.status === 'done'
+                        ? 'rgba(16,185,129,0.15)'
+                        : step.status === 'active'
+                        ? 'rgba(59,130,246,0.12)'
+                        : 'transparent',
+                      border: step.status === 'waiting' ? '1px solid #1E293B' : 'none',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      {step.status === 'done' && <Check size={11} color="#34D399" strokeWidth={2.5} />}
+                      {step.status === 'active' && <PulseRing />}
+                      {step.status === 'waiting' && <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#475569' }} />}
+                    </div>
+                    <div style={{ paddingTop: 1 }}>
+                      <div style={{
+                        fontSize: 13,
+                        color: step.status === 'waiting' ? '#475569' : '#CBD5E1',
+                        fontWeight: step.status === 'active' ? 500 : 400,
+                      }}>
+                        {step.label}
                       </div>
-                      <div className="pt-1">
-                        <div className={`text-[13px] font-medium ${
-                          step.status === 'waiting' ? 'text-[#9CA3AF]' : 'text-[#111827]'
-                        }`}>
-                          {step.label}
-                        </div>
-                        <div className={`text-[12px] mt-0.5 ${
-                          step.status === 'active' ? 'text-[#534AB7]' :
-                          step.status === 'done' ? 'text-[#639922]' : 'text-[#9CA3AF]'
-                        }`}>
-                          {step.sub}
-                        </div>
+                      <div style={{
+                        fontSize: 11, marginTop: 2,
+                        color: step.status === 'done' ? '#34D399'
+                          : step.status === 'active' ? '#60A5FA'
+                          : '#475569',
+                      }}>
+                        {step.sub}
                       </div>
                     </div>
-                  ))}
-                </div>
+                  </div>
+                ))}
               </div>
             </div>
-            <p className="text-center text-[12px] text-[#9CA3AF] mt-4">Автоматический переход через 3 секунды...</p>
           </div>
-        </main>
+          <p style={{ textAlign: 'center', fontSize: 12, color: '#475569', marginTop: 16 }}>
+            Автоматический переход через 3 секунды...
+          </p>
+        </div>
       </div>
     </div>
   );
