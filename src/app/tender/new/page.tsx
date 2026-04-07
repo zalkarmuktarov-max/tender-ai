@@ -30,7 +30,6 @@ export default function TenderNewPage() {
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) addFiles(Array.from(e.target.files));
   };
-
   const addFiles = (newFiles: File[]) => {
     const mapped: AttachedFile[] = newFiles.map((f) => ({
       id: `${Date.now()}-${Math.random()}`,
@@ -40,7 +39,6 @@ export default function TenderNewPage() {
     }));
     setFiles((prev) => [...prev, ...mapped]);
   };
-
   const removeFile = (id: string) => setFiles((prev) => prev.filter((f) => f.id !== id));
 
   const handleSubmit = async () => {
@@ -51,48 +49,45 @@ export default function TenderNewPage() {
     try {
       const supabase = createClient();
       const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) { router.push('/login'); return; }
 
-      if (authError || !user) {
-        router.push('/login');
-        return;
+      // 1. Upload first file to Storage
+      const file = files[0];
+      const filePath = `${user.id}/${Date.now()}-${file.name}`;
+      const { error: uploadError } = await supabase.storage
+        .from('documents')
+        .upload(filePath, file.raw, { upsert: false });
+
+      if (uploadError) {
+        console.error('Storage upload error:', uploadError.message);
+        // Continue — tender can be created without storage
       }
 
-      // Upload files to Storage (non-blocking — log errors but continue)
-      for (const file of files) {
-        const path = `${user.id}/${Date.now()}-${file.name}`;
-        const { error: uploadError } = await supabase.storage
-          .from('documents')
-          .upload(path, file.raw, { upsert: false });
-        if (uploadError) {
-          console.error('Storage upload error:', uploadError.message);
-          // Continue — tender record creation is more important
-        }
-      }
-
-      // Create tender record
-      const number = `ТЗ-${Date.now().toString().slice(-6)}`;
-      const name = files[0].name.replace(/\.[^.]+$/, '');
-
-      const { error: insertError } = await supabase
+      // 2. Create tender record
+      const { data: tender, error: insertError } = await supabase
         .from('tenders')
         .insert({
           user_id: user.id,
-          number,
-          name,
-          customer: 'Не указан',
+          number: `ТЗ-${Date.now().toString().slice(-6)}`,
+          name: file.name.replace(/\.[^.]+$/, ''),
+          customer: 'Обработка...',
           status: 'processing',
-        });
+        })
+        .select()
+        .single();
 
-      if (insertError) {
-        console.error('Tender insert error:', insertError.message);
-        setSubmitError(`Ошибка создания тендера: ${insertError.message}`);
+      if (insertError || !tender) {
+        setSubmitError(`Ошибка создания тендера: ${insertError?.message}`);
         setSubmitting(false);
         return;
       }
 
-      router.push('/tender/processing');
+      // 3. Redirect to processing page — it will call the API
+      const params = new URLSearchParams({ id: tender.id, file: filePath, uid: user.id });
+      router.push(`/tender/processing?${params.toString()}`);
+
     } catch (e) {
-      console.error('Unexpected error:', e);
+      console.error('Submit error:', e);
       setSubmitError('Неизвестная ошибка. Проверьте консоль.');
       setSubmitting(false);
     }
@@ -109,7 +104,6 @@ export default function TenderNewPage() {
               Загрузите техническое задание для обработки
             </p>
 
-            {/* Drop zone */}
             <div
               onClick={() => fileInputRef.current?.click()}
               onDragOver={handleDragOver}
@@ -117,19 +111,13 @@ export default function TenderNewPage() {
               onDrop={handleDrop}
               style={{
                 height: 180, border: `2px dashed ${isDragOver ? '#6366F1' : '#1E293B'}`,
-                borderRadius: 12,
-                background: isDragOver ? 'rgba(99,102,241,0.04)' : '#0F1629',
-                display: 'flex', flexDirection: 'column',
-                alignItems: 'center', justifyContent: 'center',
+                borderRadius: 12, background: isDragOver ? 'rgba(99,102,241,0.04)' : '#0F1629',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                 cursor: 'pointer', transition: 'all 0.15s ease', gap: 10,
               }}
             >
-              <input
-                ref={fileInputRef}
-                type="file" multiple accept=".pdf,.docx,.zip"
-                onChange={handleFileInput}
-                style={{ display: 'none' }}
-              />
+              <input ref={fileInputRef} type="file" multiple accept=".pdf,.docx,.zip"
+                onChange={handleFileInput} style={{ display: 'none' }} />
               <Upload size={36} color="#94A3B8" strokeWidth={1.5} />
               <div style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: 13, fontWeight: 500, color: '#CBD5E1', marginBottom: 4 }}>
@@ -139,34 +127,24 @@ export default function TenderNewPage() {
               </div>
             </div>
 
-            {/* File list */}
             {files.length > 0 && (
               <div style={{ marginTop: 12, background: '#0F1629', border: '1px solid #1E293B', borderRadius: 10, overflow: 'hidden' }}>
                 {files.map((file, i) => (
                   <div key={file.id} style={{
-                    display: 'flex', alignItems: 'center', gap: 12,
-                    padding: '10px 14px',
+                    display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px',
                     borderBottom: i < files.length - 1 ? '1px solid rgba(30,41,59,0.6)' : 'none',
                   }}>
-                    <div style={{
-                      width: 32, height: 32, borderRadius: 8,
-                      background: 'rgba(239,68,68,0.15)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                    }}>
+                    <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(239,68,68,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                       <FileText size={15} color="#F87171" strokeWidth={1.5} />
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 500, color: '#F1F5F9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {file.name}
-                      </div>
+                      <div style={{ fontSize: 13, fontWeight: 500, color: '#F1F5F9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.name}</div>
                       <div style={{ fontSize: 11, color: '#64748B' }}>{file.size}</div>
                     </div>
-                    <button
-                      onClick={() => removeFile(file.id)}
+                    <button onClick={() => removeFile(file.id)}
                       style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', padding: 4, transition: 'color 0.15s' }}
                       onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.color = '#F87171')}
-                      onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.color = '#475569')}
-                    >
+                      onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.color = '#475569')}>
                       <X size={15} />
                     </button>
                   </div>
@@ -194,7 +172,7 @@ export default function TenderNewPage() {
                 transition: 'all 0.15s',
               }}
             >
-              {submitting ? 'Загрузка и создание...' : 'Обработать тендер'}
+              {submitting ? 'Подготовка...' : 'Обработать тендер'}
               {!submitting && <ArrowRight size={16} strokeWidth={1.5} />}
             </button>
           </div>

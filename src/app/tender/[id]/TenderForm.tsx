@@ -4,7 +4,6 @@ import { useState, useRef } from 'react';
 import { FileText, Database, Download, CheckCircle, AlertTriangle, XCircle } from 'lucide-react';
 import { Sidebar } from '@/components/Sidebar';
 import { FieldStatusBadge } from '@/components/StatusBadge';
-import { mockFormFields } from '@/data/mockTenderData';
 import type { FormField } from '@/types/tender';
 
 const statusDot: Record<FormField['status'], string> = {
@@ -29,12 +28,9 @@ function renderSourceText(text: string, highlight?: string) {
   const idx = text.indexOf(highlight);
   const before = text.slice(0, idx);
   const after = text.slice(idx + highlight.length);
-  const renderParts = (str: string) => {
-    const parts = str.split(/\*\*(.+?)\*\*/g);
-    return parts.map((part, i) =>
-      i % 2 === 1 ? <strong key={i} style={{ color: '#F1F5F9' }}>{part}</strong> : part
-    );
-  };
+  const renderParts = (str: string) => str.split(/\*\*(.+?)\*\*/g).map((part, i) =>
+    i % 2 === 1 ? <strong key={i} style={{ color: '#F1F5F9' }}>{part}</strong> : part
+  );
   return (
     <>
       {renderParts(before)}
@@ -46,17 +42,19 @@ function renderSourceText(text: string, highlight?: string) {
 
 interface TenderFormProps {
   tenderId: string;
+  fields: FormField[];
+  tenderLabel?: string;
+  tenderSub?: string;
 }
 
-export function TenderForm({ tenderId }: TenderFormProps) {
-  const [selectedId, setSelectedId] = useState<number>(2);
+export function TenderForm({ tenderId, fields, tenderLabel, tenderSub }: TenderFormProps) {
+  const [selectedId, setSelectedId] = useState<number>(fields[0]?.id ?? 0);
   const tzRefs = useRef<Record<number, HTMLDivElement | null>>({});
 
-  const exactCount = mockFormFields.filter((f) => f.status === 'exact').length;
-  const inferredCount = mockFormFields.filter((f) => f.status === 'inferred').length;
-  const notFoundCount = mockFormFields.filter((f) => f.status === 'not_found').length;
-
-  const selectedField = mockFormFields.find((f) => f.id === selectedId) ?? null;
+  const exactCount = fields.filter((f) => f.status === 'exact').length;
+  const inferredCount = fields.filter((f) => f.status === 'inferred').length;
+  const notFoundCount = fields.filter((f) => f.status === 'not_found').length;
+  const selectedField = fields.find((f) => f.id === selectedId) ?? null;
 
   const handleSelectRow = (id: number) => {
     setSelectedId(id);
@@ -64,9 +62,22 @@ export function TenderForm({ tenderId }: TenderFormProps) {
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   };
 
-  const tenderLabel = tenderId === 'demo' || tenderId === '1'
-    ? 'KZ-2026-МЗ-44182'
-    : `#${tenderId}`;
+  const label = tenderLabel ?? (tenderId === 'demo' || tenderId === '1' ? 'KZ-2026-МЗ-44182' : `#${tenderId}`);
+  const sub = tenderSub ?? 'ГКП «Городская поликлиника №4» г. Астана';
+
+  if (fields.length === 0) {
+    return (
+      <div style={{ display: 'flex', minHeight: '100vh', background: '#0B0F1A' }}>
+        <Sidebar />
+        <div style={{ flex: 1, marginLeft: 210, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ textAlign: 'center', color: '#64748B', fontSize: 13 }}>
+            <div style={{ marginBottom: 8 }}>Данные Формы 2 ещё обрабатываются...</div>
+            <div style={{ fontSize: 12 }}>Обновите страницу через несколько секунд.</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#0B0F1A' }}>
@@ -74,19 +85,13 @@ export function TenderForm({ tenderId }: TenderFormProps) {
       <div style={{ flex: 1, marginLeft: 210, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         {/* Top bar */}
         <header style={{
-          height: 56,
-          background: '#0F1629',
-          borderBottom: '1px solid #1E293B',
-          display: 'flex', alignItems: 'center',
-          padding: '0 18px',
-          justifyContent: 'space-between',
-          flexShrink: 0,
+          height: 56, background: '#0F1629', borderBottom: '1px solid #1E293B',
+          display: 'flex', alignItems: 'center', padding: '0 18px',
+          justifyContent: 'space-between', flexShrink: 0,
         }}>
           <div>
-            <div style={{ fontSize: 14, fontWeight: 500, color: '#F1F5F9' }}>
-              {tenderLabel} — УЗИ-аппарат
-            </div>
-            <div style={{ fontSize: 11, color: '#64748B' }}>ГКП «Городская поликлиника №4» г. Астана</div>
+            <div style={{ fontSize: 14, fontWeight: 500, color: '#F1F5F9' }}>{label}</div>
+            <div style={{ fontSize: 11, color: '#64748B' }}>{sub}</div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -101,12 +106,10 @@ export function TenderForm({ tenderId }: TenderFormProps) {
               </span>
             </div>
             <button style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              height: 34, padding: '0 14px',
+              display: 'flex', alignItems: 'center', gap: 6, height: 34, padding: '0 14px',
               background: 'linear-gradient(135deg, #6366F1, #7C3AED)',
               color: '#ffffff', fontSize: 12, fontWeight: 500,
-              border: 'none', borderRadius: 8,
-              cursor: 'pointer',
+              border: 'none', borderRadius: 8, cursor: 'pointer',
               boxShadow: '0 0 12px rgba(99,102,241,0.2)',
             }}>
               <Download size={13} strokeWidth={1.5} />
@@ -125,27 +128,19 @@ export function TenderForm({ tenderId }: TenderFormProps) {
               <span style={{ fontSize: 10, fontWeight: 500, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>ТЗ заказчика</span>
             </div>
             <div style={{ flex: 1, overflowY: 'auto', padding: 8 }}>
-              {mockFormFields.map((field) => (
+              {fields.map((field) => (
                 <div
                   key={field.id}
                   ref={(el) => { tzRefs.current[field.id] = el; }}
                   onClick={() => handleSelectRow(field.id)}
                   style={{
-                    padding: '8px 10px',
-                    borderRadius: 6,
-                    marginBottom: 4,
-                    cursor: 'pointer',
-                    fontSize: 12, lineHeight: 1.5,
-                    transition: 'all 0.15s',
+                    padding: '8px 10px', borderRadius: 6, marginBottom: 4,
+                    cursor: 'pointer', fontSize: 12, lineHeight: 1.5, transition: 'all 0.15s',
                     background: selectedId === field.id ? 'rgba(99,102,241,0.15)' : 'transparent',
                     borderLeft: selectedId === field.id ? '3px solid #6366F1' : '3px solid transparent',
                   }}
-                  onMouseEnter={(e) => {
-                    if (selectedId !== field.id) (e.currentTarget as HTMLElement).style.background = 'rgba(99,102,241,0.04)';
-                  }}
-                  onMouseLeave={(e) => {
-                    if (selectedId !== field.id) (e.currentTarget as HTMLElement).style.background = 'transparent';
-                  }}
+                  onMouseEnter={(e) => { if (selectedId !== field.id) (e.currentTarget as HTMLElement).style.background = 'rgba(99,102,241,0.04)'; }}
+                  onMouseLeave={(e) => { if (selectedId !== field.id) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
                 >
                   <span style={{ fontWeight: 500, color: '#A5B4FC', marginRight: 6 }}>{field.id + 1}.</span>
                   <span style={{ color: '#CBD5E1' }}>{field.tz}</span>
@@ -170,24 +165,18 @@ export function TenderForm({ tenderId }: TenderFormProps) {
                   </tr>
                 </thead>
                 <tbody>
-                  {mockFormFields.map((field) => (
+                  {fields.map((field) => (
                     <tr
                       key={field.id}
                       onClick={() => handleSelectRow(field.id)}
                       style={{
                         cursor: 'pointer',
                         background: selectedId === field.id ? 'rgba(99,102,241,0.15)' : rowBg[field.status],
-                        borderBottom: '1px solid rgba(30,41,59,0.6)',
-                        transition: 'background 0.15s',
-                        outline: selectedId === field.id ? '1px solid rgba(99,102,241,0.4)' : 'none',
-                        outlineOffset: -1,
+                        borderBottom: '1px solid rgba(30,41,59,0.6)', transition: 'background 0.15s',
+                        outline: selectedId === field.id ? '1px solid rgba(99,102,241,0.4)' : 'none', outlineOffset: -1,
                       }}
-                      onMouseEnter={(e) => {
-                        if (selectedId !== field.id) (e.currentTarget as HTMLElement).style.background = 'rgba(99,102,241,0.04)';
-                      }}
-                      onMouseLeave={(e) => {
-                        if (selectedId !== field.id) (e.currentTarget as HTMLElement).style.background = rowBg[field.status];
-                      }}
+                      onMouseEnter={(e) => { if (selectedId !== field.id) (e.currentTarget as HTMLElement).style.background = 'rgba(99,102,241,0.04)'; }}
+                      onMouseLeave={(e) => { if (selectedId !== field.id) (e.currentTarget as HTMLElement).style.background = rowBg[field.status]; }}
                     >
                       <td style={{ padding: '9px 12px', fontWeight: 500, color: '#CBD5E1' }}>{field.param}</td>
                       <td style={{ padding: '9px 12px' }}>
@@ -207,7 +196,7 @@ export function TenderForm({ tenderId }: TenderFormProps) {
             </div>
           </div>
 
-          {/* Right: Источник */}
+          {/* Right: Source */}
           <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', borderBottom: '1px solid #1E293B', background: 'rgba(15,22,41,0.8)', flexShrink: 0 }}>
               <Database size={13} color="#64748B" strokeWidth={1.5} />
@@ -225,7 +214,7 @@ export function TenderForm({ tenderId }: TenderFormProps) {
                   </div>
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 500, color: '#CBD5E1', marginBottom: 4 }}>Данные не найдены</div>
-                    <div style={{ fontSize: 12, color: '#64748B' }}>Данные не найдены в базе. Заполните вручную.</div>
+                    <div style={{ fontSize: 12, color: '#64748B' }}>Заполните значение вручную.</div>
                   </div>
                 </div>
               ) : (
@@ -233,15 +222,8 @@ export function TenderForm({ tenderId }: TenderFormProps) {
                   <div style={{ fontSize: 10, fontWeight: 500, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 10 }}>
                     Извлечённый фрагмент
                   </div>
-                  <div style={{
-                    background: '#0B0F1A',
-                    border: '1px solid #1E293B',
-                    borderLeft: '3px solid #F59E0B',
-                    borderRadius: 8, padding: 12,
-                    fontSize: 12, color: '#CBD5E1', lineHeight: 1.6,
-                    marginBottom: 12,
-                  }}>
-                    {renderSourceText(selectedField.source, selectedField.highlight)}
+                  <div style={{ background: '#0B0F1A', border: '1px solid #1E293B', borderLeft: '3px solid #F59E0B', borderRadius: 8, padding: 12, fontSize: 12, color: '#CBD5E1', lineHeight: 1.6, marginBottom: 12 }}>
+                    {selectedField.source ? renderSourceText(selectedField.source, selectedField.highlight) : <span style={{ color: '#475569', fontStyle: 'italic' }}>Нет данных</span>}
                   </div>
                   {selectedField.sourceFile && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: '#475569' }}>
@@ -255,9 +237,7 @@ export function TenderForm({ tenderId }: TenderFormProps) {
                     <div style={{ fontSize: 10, fontWeight: 500, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>
                       Требование ТЗ
                     </div>
-                    <div style={{ fontSize: 12, color: '#CBD5E1', lineHeight: 1.6 }}>
-                      {selectedField.tz}
-                    </div>
+                    <div style={{ fontSize: 12, color: '#CBD5E1', lineHeight: 1.6 }}>{selectedField.tz}</div>
                   </div>
                 </div>
               )}

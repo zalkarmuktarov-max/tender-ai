@@ -12,14 +12,12 @@ const STATUS_COLORS: Record<KnowledgeDocument['status'], string> = {
   processed: '#34D399',
   error: '#F87171',
 };
-
 const STATUS_LABELS: Record<KnowledgeDocument['status'], string> = {
   uploading: 'Загрузка',
   processing: 'Обработка',
   processed: 'Готов',
   error: 'Ошибка',
 };
-
 const CATEGORY_LABELS: Record<KnowledgeDocument['category'], string> = {
   manual: 'Мануал',
   price_list: 'Прайс-лист',
@@ -29,8 +27,7 @@ const CATEGORY_LABELS: Record<KnowledgeDocument['category'], string> = {
 };
 
 function getFileIcon(type: KnowledgeDocument['file_type']) {
-  if (type === 'xlsx' || type === 'csv') return FileSpreadsheet;
-  return FileText;
+  return type === 'xlsx' || type === 'csv' ? FileSpreadsheet : FileText;
 }
 
 interface Props {
@@ -50,7 +47,6 @@ export function KnowledgeClient({ documents: initial, userId }: Props) {
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     const ext = file.name.split('.').pop()?.toLowerCase();
     if (!ext || !['pdf', 'xlsx', 'docx', 'csv'].includes(ext)) {
       setUploadError('Неподдерживаемый формат файла');
@@ -63,53 +59,54 @@ export function KnowledgeClient({ documents: initial, userId }: Props) {
     try {
       const supabase = createClient();
       const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-      if (authError || !user) {
-        setUploadError('Ошибка авторизации');
-        setUploading(false);
-        return;
-      }
+      if (authError || !user) { setUploadError('Ошибка авторизации'); setUploading(false); return; }
 
       const fileType = ext as KnowledgeDocument['file_type'];
-      const category: KnowledgeDocument['category'] =
-        fileType === 'xlsx' || fileType === 'csv' ? 'price_list' : 'manual';
-      const path = `${user.id}/${Date.now()}-${file.name}`;
+      const category: KnowledgeDocument['category'] = fileType === 'xlsx' || fileType === 'csv' ? 'price_list' : 'manual';
+      const filePath = `${user.id}/${Date.now()}-${file.name}`;
 
       // Upload to Storage
-      const { error: uploadError } = await supabase.storage
-        .from('documents')
-        .upload(path, file, { upsert: false });
-
-      if (uploadError) {
-        console.error('Storage upload error:', uploadError.message);
-        // Storage might not exist yet — still create DB record with path
-      }
+      const { error: storageError } = await supabase.storage.from('documents').upload(filePath, file, { upsert: false });
+      if (storageError) console.error('Storage error:', storageError.message);
 
       // Create DB record
       const { data: doc, error: dbError } = await supabase
         .from('knowledge_documents')
-        .insert({
-          user_id: user.id,
-          file_name: file.name,
-          file_path: path,
-          file_type: fileType,
-          file_size: file.size,
-          status: 'processing',
-          category,
-        })
-        .select()
-        .single();
+        .insert({ user_id: user.id, file_name: file.name, file_path: filePath, file_type: fileType, file_size: file.size, status: 'uploading', category })
+        .select().single();
 
       if (dbError || !doc) {
-        console.error('DB insert error:', dbError?.message);
-        setUploadError(`Ошибка сохранения: ${dbError?.message ?? 'неизвестная ошибка'}`);
+        setUploadError(`Ошибка сохранения: ${dbError?.message}`);
         setUploading(false);
         return;
       }
 
+      // Add to list with 'uploading' status
       setDocuments((prev) => [doc as KnowledgeDocument, ...prev]);
-    } catch (e) {
-      console.error('Unexpected error:', e);
+
+      // Call AI processing API
+      const res = await fetch('/api/knowledge/process', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ documentId: doc.id, filePath, userId: user.id }),
+      });
+
+      if (res.ok) {
+        const result = await res.json();
+        // Update doc status to processed with items count
+        setDocuments((prev) => prev.map((d) =>
+          d.id === doc.id
+            ? { ...d, status: 'processed' as const, items_count: result.parameters_count ?? 0 }
+            : d
+        ));
+      } else {
+        setDocuments((prev) => prev.map((d) => d.id === doc.id ? { ...d, status: 'error' as const } : d));
+        const err = await res.json();
+        setUploadError(`Ошибка обработки: ${err.error}`);
+      }
+
+    } catch (err) {
+      console.error('Upload error:', err);
       setUploadError('Неизвестная ошибка. Проверьте консоль.');
     }
 
@@ -119,9 +116,11 @@ export function KnowledgeClient({ documents: initial, userId }: Props) {
 
   const renderFile = (doc: KnowledgeDocument) => {
     const Icon = getFileIcon(doc.file_type);
-    const color = doc.file_type === 'xlsx' || doc.file_type === 'csv' ? '#34D399' : '#F87171';
-    const bg = doc.file_type === 'xlsx' || doc.file_type === 'csv' ? 'rgba(52,211,153,0.15)' : 'rgba(239,68,68,0.15)';
+    const isXlsx = doc.file_type === 'xlsx' || doc.file_type === 'csv';
+    const color = isXlsx ? '#34D399' : '#F87171';
+    const bg = isXlsx ? 'rgba(52,211,153,0.15)' : 'rgba(239,68,68,0.15)';
     const sizeMb = doc.file_size ? `${(doc.file_size / 1024 / 1024).toFixed(1)} МБ` : '';
+    const meta = [sizeMb, doc.items_count ? `${doc.items_count} параметров` : '', CATEGORY_LABELS[doc.category]].filter(Boolean).join(' · ');
 
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px' }}>
@@ -132,17 +131,13 @@ export function KnowledgeClient({ documents: initial, userId }: Props) {
           <div style={{ fontSize: 13, fontWeight: 500, color: '#F1F5F9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {doc.file_name}
           </div>
-          <div style={{ fontSize: 11, color: '#64748B' }}>
-            {[sizeMb, CATEGORY_LABELS[doc.category]].filter(Boolean).join(' · ')}
-          </div>
+          <div style={{ fontSize: 11, color: '#64748B' }}>{meta}</div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-          {doc.status === 'processing' && (
+          {(doc.status === 'processing' || doc.status === 'uploading') && (
             <RefreshCw size={12} color="#60A5FA" strokeWidth={1.5} style={{ animation: 'spin 1s linear infinite' }} />
           )}
-          <span style={{ fontSize: 11, color: STATUS_COLORS[doc.status] }}>
-            {STATUS_LABELS[doc.status]}
-          </span>
+          <span style={{ fontSize: 11, color: STATUS_COLORS[doc.status] }}>{STATUS_LABELS[doc.status]}</span>
         </div>
       </div>
     );
@@ -153,7 +148,6 @@ export function KnowledgeClient({ documents: initial, userId }: Props) {
       <Sidebar />
       <div style={{ flex: 1, marginLeft: 210 }}>
         <main style={{ padding: '24px 28px' }}>
-          {/* Header */}
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 28 }}>
             <div>
               <h1 style={{ fontSize: 22, fontWeight: 500, color: '#F1F5F9', margin: '0 0 4px' }}>База знаний</h1>
@@ -169,29 +163,13 @@ export function KnowledgeClient({ documents: initial, userId }: Props) {
                 border: '1px solid #1E293B', borderRadius: 8,
                 cursor: uploading ? 'not-allowed' : 'pointer', transition: 'all 0.15s',
               }}
-              onMouseEnter={(e) => {
-                if (!uploading) {
-                  (e.currentTarget as HTMLElement).style.borderColor = '#6366F1';
-                  (e.currentTarget as HTMLElement).style.color = '#A5B4FC';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!uploading) {
-                  (e.currentTarget as HTMLElement).style.borderColor = '#1E293B';
-                  (e.currentTarget as HTMLElement).style.color = '#94A3B8';
-                }
-              }}
+              onMouseEnter={(e) => { if (!uploading) { (e.currentTarget as HTMLElement).style.borderColor = '#6366F1'; (e.currentTarget as HTMLElement).style.color = '#A5B4FC'; } }}
+              onMouseLeave={(e) => { if (!uploading) { (e.currentTarget as HTMLElement).style.borderColor = '#1E293B'; (e.currentTarget as HTMLElement).style.color = '#94A3B8'; } }}
             >
               <Upload size={14} strokeWidth={1.5} />
-              {uploading ? 'Загрузка...' : 'Загрузить документ'}
+              {uploading ? 'Обработка...' : 'Загрузить документ'}
             </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".pdf,.docx,.xlsx,.csv"
-              onChange={handleUpload}
-              style={{ display: 'none' }}
-            />
+            <input ref={fileInputRef} type="file" accept=".pdf,.docx,.xlsx,.csv" onChange={handleUpload} style={{ display: 'none' }} />
           </div>
 
           {uploadError && (
@@ -202,7 +180,7 @@ export function KnowledgeClient({ documents: initial, userId }: Props) {
 
           {documents.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '48px 24px', color: '#64748B', fontSize: 13 }}>
-              Документов нет. Загрузите первый документ.
+              Документов нет. Загрузите первый документ — Claude AI извлечёт все параметры автоматически.
             </div>
           ) : (
             <>
@@ -220,7 +198,6 @@ export function KnowledgeClient({ documents: initial, userId }: Props) {
                   </div>
                 </div>
               )}
-
               {xlsxFiles.length > 0 && (
                 <div>
                   <h2 style={{ fontSize: 12, fontWeight: 500, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.5px', margin: '0 0 10px' }}>
@@ -239,7 +216,6 @@ export function KnowledgeClient({ documents: initial, userId }: Props) {
           )}
         </main>
       </div>
-
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>
   );
