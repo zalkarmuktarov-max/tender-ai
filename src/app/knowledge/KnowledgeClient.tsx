@@ -5,7 +5,6 @@ import { Upload, FileText, FileSpreadsheet, RefreshCw } from 'lucide-react';
 import { Sidebar } from '@/components/Sidebar';
 import { createClient } from '@/lib/supabase/client';
 import type { KnowledgeDocument } from '@/types/database';
-import { useRouter } from 'next/navigation';
 
 const STATUS_COLORS: Record<KnowledgeDocument['status'], string> = {
   uploading: '#FBBF24',
@@ -40,10 +39,10 @@ interface Props {
 }
 
 export function KnowledgeClient({ documents: initial, userId }: Props) {
-  const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [documents, setDocuments] = useState<KnowledgeDocument[]>(initial);
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
 
   const pdfs = documents.filter((d) => d.file_type === 'pdf' || d.file_type === 'docx');
   const xlsxFiles = documents.filter((d) => d.file_type === 'xlsx' || d.file_type === 'csv');
@@ -52,38 +51,66 @@ export function KnowledgeClient({ documents: initial, userId }: Props) {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const ext = file.name.split('.').pop()?.toLowerCase() as KnowledgeDocument['file_type'];
-    if (!['pdf', 'xlsx', 'docx', 'csv'].includes(ext)) return;
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    if (!ext || !['pdf', 'xlsx', 'docx', 'csv'].includes(ext)) {
+      setUploadError('Неподдерживаемый формат файла');
+      return;
+    }
 
     setUploading(true);
-    const supabase = createClient();
-    const path = `${userId}/${Date.now()}-${file.name}`;
+    setUploadError('');
 
-    const { error: uploadError } = await supabase.storage
-      .from('documents')
-      .upload(path, file, { upsert: false });
+    try {
+      const supabase = createClient();
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-    if (uploadError) { setUploading(false); return; }
+      if (authError || !user) {
+        setUploadError('Ошибка авторизации');
+        setUploading(false);
+        return;
+      }
 
-    const category: KnowledgeDocument['category'] =
-      ext === 'xlsx' || ext === 'csv' ? 'price_list' : 'manual';
+      const fileType = ext as KnowledgeDocument['file_type'];
+      const category: KnowledgeDocument['category'] =
+        fileType === 'xlsx' || fileType === 'csv' ? 'price_list' : 'manual';
+      const path = `${user.id}/${Date.now()}-${file.name}`;
 
-    const { data: doc, error: dbError } = await supabase
-      .from('knowledge_documents')
-      .insert({
-        user_id: userId,
-        file_name: file.name,
-        file_path: path,
-        file_type: ext,
-        file_size: file.size,
-        status: 'processing',
-        category,
-      })
-      .select()
-      .single();
+      // Upload to Storage
+      const { error: uploadError } = await supabase.storage
+        .from('documents')
+        .upload(path, file, { upsert: false });
 
-    if (!dbError && doc) {
+      if (uploadError) {
+        console.error('Storage upload error:', uploadError.message);
+        // Storage might not exist yet — still create DB record with path
+      }
+
+      // Create DB record
+      const { data: doc, error: dbError } = await supabase
+        .from('knowledge_documents')
+        .insert({
+          user_id: user.id,
+          file_name: file.name,
+          file_path: path,
+          file_type: fileType,
+          file_size: file.size,
+          status: 'processing',
+          category,
+        })
+        .select()
+        .single();
+
+      if (dbError || !doc) {
+        console.error('DB insert error:', dbError?.message);
+        setUploadError(`Ошибка сохранения: ${dbError?.message ?? 'неизвестная ошибка'}`);
+        setUploading(false);
+        return;
+      }
+
       setDocuments((prev) => [doc as KnowledgeDocument, ...prev]);
+    } catch (e) {
+      console.error('Unexpected error:', e);
+      setUploadError('Неизвестная ошибка. Проверьте консоль.');
     }
 
     setUploading(false);
@@ -167,13 +194,18 @@ export function KnowledgeClient({ documents: initial, userId }: Props) {
             />
           </div>
 
+          {uploadError && (
+            <div style={{ marginBottom: 16, fontSize: 12, color: '#F87171', padding: '8px 12px', background: 'rgba(239,68,68,0.08)', borderRadius: 8, border: '1px solid rgba(239,68,68,0.2)' }}>
+              {uploadError}
+            </div>
+          )}
+
           {documents.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '48px 24px', color: '#64748B', fontSize: 13 }}>
               Документов нет. Загрузите первый документ.
             </div>
           ) : (
             <>
-              {/* PDFs / DOCX section */}
               {pdfs.length > 0 && (
                 <div style={{ marginBottom: 20 }}>
                   <h2 style={{ fontSize: 12, fontWeight: 500, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.5px', margin: '0 0 10px' }}>
@@ -189,7 +221,6 @@ export function KnowledgeClient({ documents: initial, userId }: Props) {
                 </div>
               )}
 
-              {/* XLSX / CSV section */}
               {xlsxFiles.length > 0 && (
                 <div>
                   <h2 style={{ fontSize: 12, fontWeight: 500, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.5px', margin: '0 0 10px' }}>
