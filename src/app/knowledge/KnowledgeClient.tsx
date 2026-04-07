@@ -81,29 +81,50 @@ export function KnowledgeClient({ documents: initial, userId }: Props) {
         return;
       }
 
-      // Add to list with 'uploading' status
-      setDocuments((prev) => [doc as KnowledgeDocument, ...prev]);
+      // Add to list with 'processing' status
+      const processingDoc = { ...doc, status: 'processing' as const } as KnowledgeDocument;
+      setDocuments((prev) => [processingDoc, ...prev]);
 
-      // Call AI processing API
-      const res = await fetch('/api/knowledge/process', {
+      // Fire n8n webhook (fire-and-forget)
+      fetch('/api/knowledge/trigger', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ documentId: doc.id, filePath, userId: user.id }),
-      });
+      }).catch((e) => console.error('knowledge trigger error:', e));
 
-      if (res.ok) {
-        const result = await res.json();
-        // Update doc status to processed with items count
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+
+      // Poll Supabase every 3s until status changes from 'processing'
+      const POLL_TIMEOUT = 5 * 60 * 1000;
+      const pollStart = Date.now();
+      const pollStatus = async () => {
+        if (Date.now() - pollStart > POLL_TIMEOUT) {
+          setDocuments((prev) => prev.map((d) => d.id === doc.id ? { ...d, status: 'error' as const } : d));
+          setUploadError('Превышено время обработки (5 минут).');
+          return;
+        }
+        const { data: updated } = await supabase
+          .from('knowledge_documents')
+          .select('status, items_count')
+          .eq('id', doc.id)
+          .single();
+
+        if (!updated || updated.status === 'processing' || updated.status === 'uploading') {
+          setTimeout(pollStatus, 3000);
+          return;
+        }
         setDocuments((prev) => prev.map((d) =>
           d.id === doc.id
-            ? { ...d, status: 'processed' as const, items_count: result.parameters_count ?? 0 }
+            ? { ...d, status: updated.status as KnowledgeDocument['status'], items_count: updated.items_count ?? 0 }
             : d
         ));
-      } else {
-        setDocuments((prev) => prev.map((d) => d.id === doc.id ? { ...d, status: 'error' as const } : d));
-        const err = await res.json();
-        setUploadError(`Ошибка обработки: ${err.error}`);
-      }
+        if (updated.status === 'error') {
+          setUploadError('Ошибка обработки документа.');
+        }
+      };
+      setTimeout(pollStatus, 3000);
+      return;
 
     } catch (err) {
       console.error('Upload error:', err);

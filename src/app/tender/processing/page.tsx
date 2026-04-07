@@ -7,11 +7,13 @@ import { Sidebar } from '@/components/Sidebar';
 import { createClient } from '@/lib/supabase/client';
 
 const STEPS = [
-  { label: 'Загрузка документа', sub: 'Скачивание из Storage...' },
   { label: 'Парсинг ТЗ', sub: 'Извлечение требований...' },
   { label: 'AI-аудит', sub: 'Анализ рисков...' },
   { label: 'Генерация Формы 2', sub: 'Сопоставление с базой знаний...' },
 ];
+
+const STEP_DURATION_MS = 60000; // advance step every 60s visually
+const TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
 
 function PulseRing() {
   return (
@@ -32,44 +34,52 @@ function ProcessingContent() {
 
   const [activeStep, setActiveStep] = useState(0);
   const [error, setError] = useState('');
-  const apiCalled = useRef(false);
+  const triggered = useRef(false);
+  const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stepTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const startTime = useRef(Date.now());
 
   useEffect(() => {
     if (!tenderId || !filePath || !userId) {
-      // No params — demo mode, redirect after timeout
+      // Demo mode — redirect after 3s
       const t = setTimeout(() => router.push('/tender/audit'), 3000);
       return () => clearTimeout(t);
     }
 
-    if (apiCalled.current) return;
-    apiCalled.current = true;
+    if (triggered.current) return;
+    triggered.current = true;
+    startTime.current = Date.now();
 
-    // Start AI processing
-    const process = async () => {
+    const run = async () => {
+      // 1. Fire webhook (fire-and-forget via server route)
       try {
-        // Simulate step progress while API runs
-        const stepTimer = setInterval(() => {
-          setActiveStep((s) => Math.min(s + 1, STEPS.length - 1));
-        }, 8000);
-
-        const res = await fetch('/api/tender/process', {
+        await fetch('/api/tender/trigger', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ tenderId, filePath, userId }),
         });
+      } catch (e) {
+        console.error('[processing] trigger error:', e);
+        setError('Не удалось запустить обработку. Проверьте подключение.');
+        return;
+      }
 
-        clearInterval(stepTimer);
-        setActiveStep(STEPS.length - 1);
+      // 2. Advance steps visually while polling
+      stepTimer.current = setInterval(() => {
+        setActiveStep((s) => Math.min(s + 1, STEPS.length - 1));
+      }, STEP_DURATION_MS);
 
-        if (!res.ok) {
-          const data = await res.json();
-          setError(data.error || 'Ошибка обработки');
+      // 3. Poll Supabase every 3s
+      const supabase = createClient();
+      const poll = async () => {
+        // Timeout check
+        if (Date.now() - startTime.current > TIMEOUT_MS) {
+          clearInterval(stepTimer.current!);
+          setError('Превышено время ожидания (5 минут). Попробуйте снова.');
           return;
         }
 
-        // Poll DB until status = 'review'
-        const poll = async () => {
-          const supabase = createClient();
+        try {
           const { data: tender } = await supabase
             .from('tenders')
             .select('status')
@@ -77,20 +87,27 @@ function ProcessingContent() {
             .single();
 
           if (tender?.status === 'review' || tender?.status === 'completed') {
+            clearInterval(stepTimer.current!);
+            setActiveStep(STEPS.length - 1);
             router.push(`/tender/audit/${tenderId}`);
-          } else {
-            setTimeout(poll, 2000);
+            return;
           }
-        };
-        await poll();
+        } catch (e) {
+          console.error('[processing] poll error:', e);
+        }
 
-      } catch (e) {
-        console.error('Processing error:', e);
-        setError('Ошибка соединения. Попробуйте снова.');
-      }
+        pollTimer.current = setTimeout(poll, 3000);
+      };
+
+      pollTimer.current = setTimeout(poll, 3000);
     };
 
-    process();
+    run();
+
+    return () => {
+      if (pollTimer.current) clearTimeout(pollTimer.current);
+      if (stepTimer.current) clearInterval(stepTimer.current);
+    };
   }, [tenderId, filePath, userId, router]);
 
   const steps = tenderId
@@ -100,10 +117,15 @@ function ProcessingContent() {
       }))
     : [
         { label: 'Парсинг ТЗ', sub: 'Извлечено 16 требований', status: 'done' },
-        { label: 'Поиск по базе знаний', sub: 'Найдено 3 подходящих товара', status: 'done' },
+        { label: 'AI-аудит', sub: 'Найдено 3 риска', status: 'done' },
         { label: 'Генерация Формы 2', sub: 'Заполняется...', status: 'active' },
-        { label: 'Валидация', sub: 'Ожидание', status: 'waiting' },
       ];
+
+  const handleRetry = () => {
+    triggered.current = false;
+    setError('');
+    setActiveStep(0);
+  };
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#0B0F1A' }}>
@@ -115,14 +137,14 @@ function ProcessingContent() {
               {tenderId ? 'Обработка документа' : 'KZ-2026-МЗ-44182'}
             </h1>
             <p style={{ fontSize: 12, color: '#64748B', margin: '0 0 28px' }}>
-              {tenderId ? 'Claude AI анализирует ТЗ...' : 'УЗИ-аппарат — обработка документов'}
+              {tenderId ? 'n8n + Claude AI анализируют ТЗ...' : 'УЗИ-аппарат — обработка документов'}
             </p>
 
             {error ? (
               <div style={{ padding: '12px 16px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, fontSize: 13, color: '#F87171' }}>
                 {error}
                 <button
-                  onClick={() => { apiCalled.current = false; setError(''); setActiveStep(0); }}
+                  onClick={handleRetry}
                   style={{ display: 'block', marginTop: 8, background: 'none', border: 'none', color: '#A5B4FC', cursor: 'pointer', fontSize: 12, padding: 0 }}
                 >
                   Попробовать снова
@@ -159,7 +181,7 @@ function ProcessingContent() {
             )}
           </div>
           <p style={{ textAlign: 'center', fontSize: 12, color: '#475569', marginTop: 16 }}>
-            {error ? '' : tenderId ? 'Обработка занимает 30–60 секунд...' : 'Автоматический переход через 3 секунды...'}
+            {error ? '' : tenderId ? 'Обработка занимает 1–3 минуты...' : 'Автоматический переход через 3 секунды...'}
           </p>
         </div>
       </div>
