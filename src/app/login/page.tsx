@@ -2,15 +2,49 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
+
+type Mode = 'login' | 'register';
 
 export default function LoginPage() {
   const router = useRouter();
+  const [mode, setMode] = useState<Mode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    router.push('/dashboard');
+    setError('');
+    setLoading(true);
+    const supabase = createClient();
+
+    if (mode === 'login') {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        setError(error.message);
+      } else {
+        router.push('/dashboard');
+        router.refresh();
+      }
+    } else {
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { full_name: fullName } },
+      });
+      if (error) {
+        setError(error.message);
+      } else {
+        setError('');
+        setMode('login');
+        setPassword('');
+        setFullName('');
+      }
+    }
+    setLoading(false);
   };
 
   return (
@@ -22,7 +56,6 @@ export default function LoginPage() {
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         position: 'relative', overflow: 'hidden',
       }}>
-        {/* Decorative glows */}
         <div style={{
           position: 'absolute', top: '20%', left: '20%',
           width: 300, height: 300, borderRadius: '50%',
@@ -35,7 +68,6 @@ export default function LoginPage() {
           background: 'radial-gradient(circle, rgba(124,58,237,0.12) 0%, transparent 70%)',
           pointerEvents: 'none',
         }} />
-
         <div style={{ textAlign: 'center', position: 'relative', zIndex: 1, padding: '0 40px' }}>
           <div style={{
             width: 56, height: 56,
@@ -68,14 +100,36 @@ export default function LoginPage() {
         <div style={{ width: 300 }}>
           <div style={{ marginBottom: 28 }}>
             <div style={{ fontSize: 20, fontWeight: 500, color: '#F1F5F9', marginBottom: 6 }}>
-              Вход в систему
+              {mode === 'login' ? 'Вход в систему' : 'Регистрация'}
             </div>
             <div style={{ fontSize: 12, color: '#64748B' }}>
-              Введите данные для входа
+              {mode === 'login' ? 'Введите данные для входа' : 'Создайте аккаунт'}
             </div>
           </div>
 
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {mode === 'register' && (
+              <div>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 500, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 6 }}>
+                  Имя
+                </label>
+                <input
+                  type="text"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="Иван Иванов"
+                  required
+                  style={{
+                    width: '100%', height: 42, padding: '0 14px',
+                    background: '#0B0F1A', border: '1px solid #1E293B',
+                    borderRadius: 10, color: '#F1F5F9', fontSize: 13,
+                    outline: 'none', boxSizing: 'border-box', transition: 'border-color 0.15s',
+                  }}
+                  onFocus={(e) => (e.target.style.borderColor = '#6366F1')}
+                  onBlur={(e) => (e.target.style.borderColor = '#1E293B')}
+                />
+              </div>
+            )}
             <div>
               <label style={{ display: 'block', fontSize: 11, fontWeight: 500, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 6 }}>
                 Email
@@ -85,17 +139,12 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="admin@cognitai.kz"
+                required
                 style={{
-                  width: '100%', height: 42,
-                  padding: '0 14px',
-                  background: '#0B0F1A',
-                  border: '1px solid #1E293B',
-                  borderRadius: 10,
-                  color: '#F1F5F9',
-                  fontSize: 13,
-                  outline: 'none',
-                  boxSizing: 'border-box',
-                  transition: 'border-color 0.15s',
+                  width: '100%', height: 42, padding: '0 14px',
+                  background: '#0B0F1A', border: '1px solid #1E293B',
+                  borderRadius: 10, color: '#F1F5F9', fontSize: 13,
+                  outline: 'none', boxSizing: 'border-box', transition: 'border-color 0.15s',
                 }}
                 onFocus={(e) => (e.target.style.borderColor = '#6366F1')}
                 onBlur={(e) => (e.target.style.borderColor = '#1E293B')}
@@ -110,41 +159,66 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
+                required
                 style={{
-                  width: '100%', height: 42,
-                  padding: '0 14px',
-                  background: '#0B0F1A',
-                  border: '1px solid #1E293B',
-                  borderRadius: 10,
-                  color: '#F1F5F9',
-                  fontSize: 13,
-                  outline: 'none',
-                  boxSizing: 'border-box',
-                  transition: 'border-color 0.15s',
+                  width: '100%', height: 42, padding: '0 14px',
+                  background: '#0B0F1A', border: '1px solid #1E293B',
+                  borderRadius: 10, color: '#F1F5F9', fontSize: 13,
+                  outline: 'none', boxSizing: 'border-box', transition: 'border-color 0.15s',
                 }}
                 onFocus={(e) => (e.target.style.borderColor = '#6366F1')}
                 onBlur={(e) => (e.target.style.borderColor = '#1E293B')}
               />
             </div>
+
+            {error && (
+              <div style={{ fontSize: 12, color: '#F87171', padding: '8px 12px', background: 'rgba(239,68,68,0.08)', borderRadius: 8, border: '1px solid rgba(239,68,68,0.2)' }}>
+                {error}
+              </div>
+            )}
+
             <button
               type="submit"
+              disabled={loading}
               style={{
                 width: '100%', height: 44,
-                background: 'linear-gradient(135deg, #6366F1, #7C3AED)',
-                color: '#ffffff',
+                background: loading ? '#1E293B' : 'linear-gradient(135deg, #6366F1, #7C3AED)',
+                color: loading ? '#475569' : '#ffffff',
                 fontSize: 14, fontWeight: 500,
                 border: 'none', borderRadius: 10,
-                cursor: 'pointer',
+                cursor: loading ? 'not-allowed' : 'pointer',
                 marginTop: 4,
-                boxShadow: '0 0 20px rgba(99,102,241,0.25)',
+                boxShadow: loading ? 'none' : '0 0 20px rgba(99,102,241,0.25)',
                 transition: 'opacity 0.15s',
               }}
-              onMouseEnter={(e) => ((e.target as HTMLElement).style.opacity = '0.9')}
-              onMouseLeave={(e) => ((e.target as HTMLElement).style.opacity = '1')}
             >
-              Войти
+              {loading ? 'Загрузка...' : mode === 'login' ? 'Войти' : 'Зарегистрироваться'}
             </button>
           </form>
+
+          <div style={{ marginTop: 20, textAlign: 'center', fontSize: 12, color: '#64748B' }}>
+            {mode === 'login' ? (
+              <>
+                Нет аккаунта?{' '}
+                <button
+                  onClick={() => { setMode('register'); setError(''); }}
+                  style={{ background: 'none', border: 'none', color: '#A5B4FC', cursor: 'pointer', fontSize: 12, padding: 0 }}
+                >
+                  Зарегистрироваться
+                </button>
+              </>
+            ) : (
+              <>
+                Уже есть аккаунт?{' '}
+                <button
+                  onClick={() => { setMode('login'); setError(''); }}
+                  style={{ background: 'none', border: 'none', color: '#A5B4FC', cursor: 'pointer', fontSize: 12, padding: 0 }}
+                >
+                  Войти
+                </button>
+              </>
+            )}
+          </div>
         </div>
       </div>
     </div>

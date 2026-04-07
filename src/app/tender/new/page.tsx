@@ -4,20 +4,25 @@ import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Upload, FileText, X, ArrowRight } from 'lucide-react';
 import { Sidebar } from '@/components/Sidebar';
+import { createClient } from '@/lib/supabase/client';
 
 interface AttachedFile {
-  id: number;
+  id: string;
   name: string;
   size: string;
+  raw: File;
+  progress: number;
+  uploaded: boolean;
+  storagePath?: string;
 }
 
 export default function TenderNewPage() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
-  const [files, setFiles] = useState<AttachedFile[]>([
-    { id: 1, name: 'ТЗ_УЗИ_аппарат_Поликлиника4_Астана.pdf', size: '2.4 МБ' },
-  ]);
+  const [files, setFiles] = useState<AttachedFile[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); setIsDragOver(true); };
   const handleDragLeave = () => setIsDragOver(false);
@@ -28,15 +33,83 @@ export default function TenderNewPage() {
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) addFiles(Array.from(e.target.files));
   };
+
   const addFiles = (newFiles: File[]) => {
-    const mapped = newFiles.map((f, i) => ({
-      id: Date.now() + i,
+    const mapped: AttachedFile[] = newFiles.map((f) => ({
+      id: `${Date.now()}-${Math.random()}`,
       name: f.name,
       size: `${(f.size / 1024 / 1024).toFixed(1)} МБ`,
+      raw: f,
+      progress: 0,
+      uploaded: false,
     }));
     setFiles((prev) => [...prev, ...mapped]);
+    mapped.forEach((f) => uploadFile(f));
   };
-  const removeFile = (id: number) => setFiles((prev) => prev.filter((f) => f.id !== id));
+
+  const uploadFile = async (file: AttachedFile) => {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const path = `${user.id}/${Date.now()}-${file.name}`;
+
+    setFiles((prev) => prev.map((f) => f.id === file.id ? { ...f, progress: 10 } : f));
+
+    const { error } = await supabase.storage
+      .from('documents')
+      .upload(path, file.raw, { upsert: false });
+
+    if (error) {
+      setFiles((prev) => prev.map((f) =>
+        f.id === file.id ? { ...f, progress: 0 } : f
+      ));
+      return;
+    }
+
+    setFiles((prev) => prev.map((f) =>
+      f.id === file.id ? { ...f, progress: 100, uploaded: true, storagePath: path } : f
+    ));
+  };
+
+  const removeFile = (id: string) => setFiles((prev) => prev.filter((f) => f.id !== id));
+
+  const handleSubmit = async () => {
+    const uploadedFiles = files.filter((f) => f.uploaded);
+    if (uploadedFiles.length === 0) return;
+
+    setSubmitting(true);
+    setSubmitError('');
+
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { router.push('/login'); return; }
+
+    const number = `ТЗ-${Date.now().toString().slice(-6)}`;
+    const firstName = uploadedFiles[0].name.replace(/\.[^.]+$/, '');
+
+    const { data: tender, error } = await supabase
+      .from('tenders')
+      .insert({
+        user_id: user.id,
+        number,
+        name: firstName,
+        customer: 'Не указан',
+        status: 'processing',
+      })
+      .select()
+      .single();
+
+    if (error || !tender) {
+      setSubmitError('Ошибка создания тендера');
+      setSubmitting(false);
+      return;
+    }
+
+    router.push('/tender/processing');
+  };
+
+  const allUploaded = files.length > 0 && files.every((f) => f.uploaded);
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#0B0F1A' }}>
@@ -56,15 +129,12 @@ export default function TenderNewPage() {
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
               style={{
-                height: 180,
-                border: `2px dashed ${isDragOver ? '#6366F1' : '#1E293B'}`,
+                height: 180, border: `2px dashed ${isDragOver ? '#6366F1' : '#1E293B'}`,
                 borderRadius: 12,
                 background: isDragOver ? 'rgba(99,102,241,0.04)' : '#0F1629',
                 display: 'flex', flexDirection: 'column',
                 alignItems: 'center', justifyContent: 'center',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-                gap: 10,
+                cursor: 'pointer', transition: 'all 0.15s ease', gap: 10,
               }}
             >
               <input
@@ -84,21 +154,13 @@ export default function TenderNewPage() {
 
             {/* File list */}
             {files.length > 0 && (
-              <div style={{
-                marginTop: 12,
-                background: '#0F1629',
-                border: '1px solid #1E293B',
-                borderRadius: 10,
-                overflow: 'hidden',
-              }}>
-                {files.map((file) => (
+              <div style={{ marginTop: 12, background: '#0F1629', border: '1px solid #1E293B', borderRadius: 10, overflow: 'hidden' }}>
+                {files.map((file, i) => (
                   <div key={file.id} style={{
                     display: 'flex', alignItems: 'center', gap: 12,
                     padding: '10px 14px',
-                    borderBottom: '1px solid rgba(30,41,59,0.6)',
-                  }}
-                  className="last:border-b-0"
-                  >
+                    borderBottom: i < files.length - 1 ? '1px solid rgba(30,41,59,0.6)' : 'none',
+                  }}>
                     <div style={{
                       width: 32, height: 32, borderRadius: 8,
                       background: 'rgba(239,68,68,0.15)',
@@ -110,7 +172,17 @@ export default function TenderNewPage() {
                       <div style={{ fontSize: 13, fontWeight: 500, color: '#F1F5F9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {file.name}
                       </div>
-                      <div style={{ fontSize: 11, color: '#64748B' }}>{file.size}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                        <div style={{ fontSize: 11, color: '#64748B' }}>{file.size}</div>
+                        {file.progress > 0 && !file.uploaded && (
+                          <div style={{ flex: 1, height: 3, background: '#1E293B', borderRadius: 2, overflow: 'hidden' }}>
+                            <div style={{ width: `${file.progress}%`, height: '100%', background: '#6366F1', transition: 'width 0.3s' }} />
+                          </div>
+                        )}
+                        {file.uploaded && (
+                          <div style={{ fontSize: 11, color: '#34D399' }}>Загружено</div>
+                        )}
+                      </div>
                     </div>
                     <button
                       onClick={() => removeFile(file.id)}
@@ -125,24 +197,28 @@ export default function TenderNewPage() {
               </div>
             )}
 
+            {submitError && (
+              <div style={{ marginTop: 12, fontSize: 12, color: '#F87171', padding: '8px 12px', background: 'rgba(239,68,68,0.08)', borderRadius: 8, border: '1px solid rgba(239,68,68,0.2)' }}>
+                {submitError}
+              </div>
+            )}
+
             <button
-              onClick={() => router.push('/tender/processing')}
-              disabled={files.length === 0}
+              onClick={handleSubmit}
+              disabled={!allUploaded || submitting}
               style={{
-                marginTop: 20,
-                width: '100%', height: 46,
+                marginTop: 20, width: '100%', height: 46,
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                background: files.length === 0 ? '#1E293B' : 'linear-gradient(135deg, #6366F1, #7C3AED)',
-                color: files.length === 0 ? '#475569' : '#ffffff',
-                fontSize: 14, fontWeight: 500,
-                border: 'none', borderRadius: 10,
-                cursor: files.length === 0 ? 'not-allowed' : 'pointer',
-                boxShadow: files.length === 0 ? 'none' : '0 0 20px rgba(99,102,241,0.25)',
+                background: (!allUploaded || submitting) ? '#1E293B' : 'linear-gradient(135deg, #6366F1, #7C3AED)',
+                color: (!allUploaded || submitting) ? '#475569' : '#ffffff',
+                fontSize: 14, fontWeight: 500, border: 'none', borderRadius: 10,
+                cursor: (!allUploaded || submitting) ? 'not-allowed' : 'pointer',
+                boxShadow: (!allUploaded || submitting) ? 'none' : '0 0 20px rgba(99,102,241,0.25)',
                 transition: 'all 0.15s',
               }}
             >
-              Обработать тендер
-              <ArrowRight size={16} strokeWidth={1.5} />
+              {submitting ? 'Создание...' : 'Обработать тендер'}
+              {!submitting && <ArrowRight size={16} strokeWidth={1.5} />}
             </button>
           </div>
         </main>
