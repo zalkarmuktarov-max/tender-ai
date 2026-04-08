@@ -14,17 +14,23 @@ export async function POST(request: NextRequest) {
   }
 
   const webhookUrl = process.env.N8N_WEBHOOK_URL
+  console.log('Webhook URL:', webhookUrl)
   if (!webhookUrl) {
     console.error('[trigger] N8N_WEBHOOK_URL is not set')
     return NextResponse.json({ error: 'N8N_WEBHOOK_URL not configured' }, { status: 500 })
   }
 
-  // Fire and forget — do not await
-  fetch(webhookUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ tenderId, filePath, userId }),
-  }).catch((e) => console.error('[trigger] n8n webhook error:', e))
-
-  return NextResponse.json({ ok: true }, { status: 202 })
+  try {
+    const response = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tenderId, filePath, userId }),
+    })
+    const text = await response.text()
+    console.log('Webhook response:', response.status, text)
+    return NextResponse.json({ ok: true, webhookStatus: response.status, webhookResponse: text })
+  } catch (error) {
+    console.error('Webhook error:', error)
+    return NextResponse.json({ ok: false, error: (error as Error).message }, { status: 500 })
+  }
 }
