@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { AlertTriangle, CheckCircle } from 'lucide-react';
 import { Sidebar } from '@/components/Sidebar';
+import type { Requirement } from './page';
 
 interface AuditData {
   critical_risks: string[];
@@ -23,9 +24,10 @@ interface TenderInfo {
 interface Props {
   tender: TenderInfo;
   audit: AuditData;
+  requirements: Requirement[];
 }
 
-export function AuditClient({ tender, audit }: Props) {
+export function AuditClient({ tender, audit, requirements }: Props) {
   const router = useRouter();
 
   return (
@@ -113,6 +115,20 @@ export function AuditClient({ tender, audit }: Props) {
               )}
             </div>
           </div>
+
+          {/* Requirements */}
+          {requirements.length > 0 && (
+            <div style={{ background: '#0F1629', border: '1px solid #1E293B', borderRadius: 10, padding: '16px 20px' }}>
+              <span style={{ fontSize: 14, fontWeight: 500, color: '#94A3B8', display: 'block', marginBottom: 12 }}>
+                Требования ({requirements.length})
+              </span>
+              <ol style={{ margin: 0, padding: '0 0 0 18px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {requirements.map((r) => (
+                  <li key={r.id} style={{ fontSize: 13, color: '#CBD5E1', lineHeight: 1.5 }}>{r.text}</li>
+                ))}
+              </ol>
+            </div>
+          )}
 
           <div style={{ display: 'flex', gap: 12, marginTop: 28 }}>
             <button
