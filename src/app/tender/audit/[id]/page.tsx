@@ -37,12 +37,27 @@ export default async function AuditPage({ params }: { params: Promise<{ id: stri
 
   if (!tender) redirect('/dashboard');
 
-  const raw = tender.audit_data as Partial<AuditData> | null;
+  console.log('[audit] tender.audit_data type:', typeof tender.audit_data);
+  console.log('[audit] tender.audit_data raw:', JSON.stringify(tender.audit_data));
+
+  let parsed: Partial<AuditData> | null = null;
+  if (typeof tender.audit_data === 'string') {
+    try {
+      parsed = JSON.parse(tender.audit_data);
+    } catch (e) {
+      console.error('[audit] Failed to parse audit_data string:', e);
+    }
+  } else {
+    parsed = tender.audit_data as Partial<AuditData> | null;
+  }
+
+  console.log('[audit] parsed:', JSON.stringify(parsed));
+
   const audit: AuditData = {
-    critical_risks: Array.isArray(raw?.critical_risks) ? raw.critical_risks : [],
-    warnings: Array.isArray(raw?.warnings) ? raw.warnings : [],
-    recommendation: raw?.recommendation ?? 'Анализ не выполнен.',
-    match_percent: raw?.match_percent ?? 0,
+    critical_risks: Array.isArray(parsed?.critical_risks) ? parsed.critical_risks : [],
+    warnings: Array.isArray(parsed?.warnings) ? parsed.warnings : [],
+    recommendation: parsed?.recommendation ?? 'Анализ не выполнен.',
+    match_percent: parsed?.match_percent ?? 0,
   };
 
   return (
