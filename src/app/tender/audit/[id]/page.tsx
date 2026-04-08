@@ -72,6 +72,7 @@ export default async function AuditPage({ params }: { params: Promise<{ id: stri
       }}
       audit={audit}
       requirements={(requirements ?? []) as Requirement[]}
+      rawAuditData={tender.audit_data}
     />
   );
 }

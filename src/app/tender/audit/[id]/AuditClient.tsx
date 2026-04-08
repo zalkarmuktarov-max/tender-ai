@@ -25,9 +25,10 @@ interface Props {
   tender: TenderInfo;
   audit: AuditData;
   requirements: Requirement[];
+  rawAuditData: unknown;
 }
 
-export function AuditClient({ tender, audit, requirements }: Props) {
+export function AuditClient({ tender, audit, requirements, rawAuditData }: Props) {
   const router = useRouter();
 
   return (
@@ -166,6 +167,10 @@ export function AuditClient({ tender, audit, requirements }: Props) {
               Вернуться на дашборд
             </button>
           </div>
+          {/* DEBUG */}
+          <pre style={{ color: 'white', fontSize: 10, maxHeight: 200, overflow: 'auto', background: '#1a1a2e', padding: 8, borderRadius: 8, marginTop: 24 }}>
+            {JSON.stringify(rawAuditData, null, 2)}
+          </pre>
         </main>
       </div>
     </div>
