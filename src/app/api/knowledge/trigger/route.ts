@@ -19,11 +19,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'N8N_KNOWLEDGE_WEBHOOK_URL not configured' }, { status: 500 })
   }
 
+  console.log('[knowledge/trigger] incoming body:', { document_id, file_url, user_id })
+
   // Fire and forget — do not await
   fetch(webhookUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ document_id, file_url, user_id }),
+  }).then(async (res) => {
+    const text = await res.text()
+    console.log('[knowledge/trigger] n8n response:', res.status, text)
   }).catch((e) => console.error('[knowledge/trigger] n8n webhook error:', e))
 
   return NextResponse.json({ ok: true }, { status: 202 })

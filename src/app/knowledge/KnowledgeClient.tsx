@@ -89,6 +89,7 @@ export function KnowledgeClient({ documents: initial, userId }: Props) {
       const { data: { publicUrl } } = supabase.storage.from('documents').getPublicUrl(filePath);
 
       // Fire n8n webhook (fire-and-forget)
+      console.log('Triggering knowledge webhook with:', { document_id: doc.id, file_url: publicUrl, user_id: user.id });
       fetch('/api/knowledge/trigger', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
