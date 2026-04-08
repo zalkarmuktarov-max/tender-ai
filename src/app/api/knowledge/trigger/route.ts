@@ -21,15 +21,17 @@ export async function POST(request: NextRequest) {
 
   console.log('[knowledge/trigger] incoming body:', { document_id, file_url, user_id })
 
-  // Fire and forget — do not await
-  fetch(webhookUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ document_id, file_url, user_id }),
-  }).then(async (res) => {
+  try {
+    const res = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ document_id, file_url, user_id }),
+    })
     const text = await res.text()
     console.log('[knowledge/trigger] n8n response:', res.status, text)
-  }).catch((e) => console.error('[knowledge/trigger] n8n webhook error:', e))
-
-  return NextResponse.json({ ok: true }, { status: 202 })
+    return NextResponse.json({ ok: true, n8n_status: res.status, n8n_body: text })
+  } catch (e) {
+    console.error('[knowledge/trigger] n8n webhook error:', e)
+    return NextResponse.json({ ok: false, error: (e as Error).message }, { status: 500 })
+  }
 }
