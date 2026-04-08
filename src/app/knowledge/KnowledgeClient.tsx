@@ -85,11 +85,14 @@ export function KnowledgeClient({ documents: initial, userId }: Props) {
       const processingDoc = { ...doc, status: 'processing' as const } as KnowledgeDocument;
       setDocuments((prev) => [processingDoc, ...prev]);
 
+      // Get public URL for the uploaded file
+      const { data: { publicUrl } } = supabase.storage.from('documents').getPublicUrl(filePath);
+
       // Fire n8n webhook (fire-and-forget)
       fetch('/api/knowledge/trigger', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ documentId: doc.id, filePath, userId: user.id }),
+        body: JSON.stringify({ document_id: doc.id, file_url: publicUrl, user_id: user.id }),
       }).catch((e) => console.error('knowledge trigger error:', e));
 
       setUploading(false);
