@@ -85,15 +85,17 @@ export function KnowledgeClient({ documents: initial, userId }: Props) {
       const processingDoc = { ...doc, status: 'processing' as const } as KnowledgeDocument;
       setDocuments((prev) => [processingDoc, ...prev]);
 
-      // Get public URL for the uploaded file
-      const { data: { publicUrl } } = supabase.storage.from('documents').getPublicUrl(filePath);
+      // Get signed URL for the uploaded file (1 hour)
+      const { data: signedUrlData, error: signedError } = await supabase.storage.from('documents').createSignedUrl(filePath, 3600);
+      if (signedError) console.error('Signed URL error:', signedError.message);
+      const file_url = signedUrlData?.signedUrl;
 
       // Fire n8n webhook (fire-and-forget)
-      console.log('Triggering knowledge webhook with:', { document_id: doc.id, file_url: publicUrl, user_id: user.id });
+      console.log('Triggering knowledge webhook with:', { document_id: doc.id, file_url, user_id: user.id });
       fetch('/api/knowledge/trigger', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ document_id: doc.id, file_url: publicUrl, user_id: user.id }),
+        body: JSON.stringify({ document_id: doc.id, file_url, user_id: user.id }),
       }).catch((e) => console.error('knowledge trigger error:', e));
 
       setUploading(false);
