@@ -1,32 +1,26 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
-import { Search } from 'lucide-react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
+import { Search, RefreshCw, ExternalLink } from 'lucide-react';
 import { Sidebar } from '@/components/Sidebar';
+import { createClient } from '@/lib/supabase/client';
 
-interface Tender {
+const supabase = createClient();
+
+interface RecommendedTender {
   id: string;
-  name: string;
+  title: string;
   customer: string;
-  budget: string;
-  budgetNum: number;
-  deadline: string;
-  relevance: number;
-  region: string;
-  category: string;
+  budget: number | null;
+  currency: string | null;
+  deadline: string | null;
+  relevance_score: number;
+  relevance_reason: string | null;
+  source: string | null;
+  url: string | null;
 }
 
-const TENDERS: Tender[] = [
-  { id: 'KZ-2026-МЗ-44182', name: 'Поставка аппарата УЗИ для ГКП «Городская поликлиника №4» г. Астана', customer: 'ГКП «Городская поликлиника №4»', budget: '4 800 000 ₸', budgetNum: 4800000, deadline: '18.04.2026', relevance: 92, region: 'Астана', category: 'Медоборудование' },
-  { id: 'KZ-2026-МЗ-44190', name: 'Поставка портативного УЗИ-сканера для БСМП г. Алматы', customer: 'ГКП «БСМП» г. Алматы', budget: '5 500 000 ₸', budgetNum: 5500000, deadline: '22.04.2026', relevance: 88, region: 'Алматы', category: 'Медоборудование' },
-  { id: 'KZ-2026-МЗ-44201', name: 'Закупка рентгенодиагностического комплекса для ОКБ Караганда', customer: 'ГКП «ОКБ» Караганда', budget: '18 200 000 ₸', budgetNum: 18200000, deadline: '25.04.2026', relevance: 34, region: 'Караганда', category: 'Медоборудование' },
-  { id: 'KZ-2026-МЗ-44215', name: 'Поставка аппарата ИВЛ для ОРИТ ГКБ №7 Шымкент', customer: 'ГКП «ГКБ №7» Шымкент', budget: '8 900 000 ₸', budgetNum: 8900000, deadline: '20.04.2026', relevance: 15, region: 'Шымкент', category: 'Медоборудование' },
-  { id: 'KZ-2026-ИТ-30441', name: 'Поставка серверного оборудования для АО «Казпочта»', customer: 'АО «Казпочта»', budget: '32 000 000 ₸', budgetNum: 32000000, deadline: '28.04.2026', relevance: 8, region: 'Астана', category: 'IT-оборудование' },
-  { id: 'KZ-2026-МЗ-44228', name: 'Поставка эндоскопического оборудования для ГБ Актау', customer: 'ГКП «Городская больница» Актау', budget: '12 400 000 ₸', budgetNum: 12400000, deadline: '30.04.2026', relevance: 45, region: 'Актау', category: 'Медоборудование' },
-  { id: 'KZ-2026-МЗ-44236', name: 'Закупка лабораторного анализатора для ЦРБ Тараз', customer: 'ГКП «ЦРБ» Тараз', budget: '6 700 000 ₸', budgetNum: 6700000, deadline: '15.04.2026', relevance: 71, region: 'Алматы', category: 'Медоборудование' },
-  { id: 'KZ-2026-МЗ-44244', name: 'Поставка цифрового маммографа для онкоцентр Астана', customer: 'ГКП «Онкоцентр» Астана', budget: '22 500 000 ₸', budgetNum: 22500000, deadline: '02.05.2026', relevance: 28, region: 'Астана', category: 'Медоборудование' },
-];
+type SortField = 'relevance_score' | 'budget' | 'deadline';
 
 const selectStyle: React.CSSProperties = {
   height: 36,
@@ -51,80 +45,181 @@ const inputStyle: React.CSSProperties = {
   outline: 'none',
 };
 
-function RelevanceBar({ value }: { value: number }) {
-  const color = value > 70 ? '#34D399' : value >= 30 ? '#FBBF24' : '#475569';
+function RelevanceBadge({ value }: { value: number }) {
+  const color = value > 70 ? '#34D399' : value >= 40 ? '#FBBF24' : '#F87171';
+  const bg = value > 70 ? 'rgba(52,211,153,0.1)' : value >= 40 ? 'rgba(251,191,36,0.1)' : 'rgba(248,113,113,0.1)';
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-      <div style={{ width: 72, height: 6, background: '#1E293B', borderRadius: 3, overflow: 'hidden' }}>
-        <div style={{ height: '100%', width: `${value}%`, background: color, borderRadius: 3, transition: 'width 0.3s' }} />
+      <div style={{ width: 64, height: 5, background: '#1E293B', borderRadius: 3, overflow: 'hidden' }}>
+        <div style={{ height: '100%', width: `${value}%`, background: color, borderRadius: 3 }} />
       </div>
-      <span style={{ fontSize: 12, fontWeight: 500, color, minWidth: 32 }}>{value}%</span>
+      <span style={{
+        fontSize: 11, fontWeight: 600, color,
+        background: bg, padding: '2px 7px', borderRadius: 4, minWidth: 36, textAlign: 'center',
+      }}>
+        {value}%
+      </span>
     </div>
   );
 }
 
+function formatBudget(budget: number | null, currency: string | null) {
+  if (budget == null) return '—';
+  const formatted = budget.toLocaleString('ru-RU');
+  const cur = currency ?? '₸';
+  return `${formatted} ${cur}`;
+}
+
+function formatDeadline(deadline: string | null) {
+  if (!deadline) return '—';
+  const d = new Date(deadline);
+  if (isNaN(d.getTime())) return deadline;
+  return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
 export default function TendersSearchPage() {
-  const router = useRouter();
+  const [tenders, setTenders] = useState<RecommendedTender[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+
   const [query, setQuery] = useState('');
-  const [category, setCategory] = useState('Все');
-  const [region, setRegion] = useState('Все регионы');
-  const [budgetFrom, setBudgetFrom] = useState('');
-  const [budgetTo, setBudgetTo] = useState('');
+  const [minScore, setMinScore] = useState('');
+  const [sortField, setSortField] = useState<SortField>('relevance_score');
+  const [sortAsc, setSortAsc] = useState(false);
+
+  const fetchTenders = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('recommended_tenders')
+      .select('*')
+      .order('relevance_score', { ascending: false });
+
+    if (!error && data) {
+      setTenders(data as RecommendedTender[]);
+      setLastUpdated(new Date());
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    fetchTenders();
+    const interval = setInterval(fetchTenders, 60_000);
+    return () => clearInterval(interval);
+  }, [fetchTenders]);
 
   const filtered = useMemo(() => {
-    return TENDERS.filter((t) => {
+    const min = minScore ? parseInt(minScore) : 0;
+    let result = tenders.filter((t) => {
       const matchQuery = !query ||
-        t.name.toLowerCase().includes(query.toLowerCase()) ||
-        t.id.toLowerCase().includes(query.toLowerCase()) ||
-        t.customer.toLowerCase().includes(query.toLowerCase());
-      const matchCategory = category === 'Все' || t.category === category;
-      const matchRegion = region === 'Все регионы' || t.region === region;
-      const from = budgetFrom ? parseInt(budgetFrom.replace(/\D/g, '')) : 0;
-      const to = budgetTo ? parseInt(budgetTo.replace(/\D/g, '')) : Infinity;
-      const matchBudget = t.budgetNum >= from && t.budgetNum <= to;
-      return matchQuery && matchCategory && matchRegion && matchBudget;
-    }).sort((a, b) => b.relevance - a.relevance);
-  }, [query, category, region, budgetFrom, budgetTo]);
+        t.title?.toLowerCase().includes(query.toLowerCase()) ||
+        t.customer?.toLowerCase().includes(query.toLowerCase()) ||
+        t.source?.toLowerCase().includes(query.toLowerCase());
+      const matchScore = t.relevance_score >= min;
+      return matchQuery && matchScore;
+    });
 
-  const headers = ['Номер закупки', 'Наименование', 'Заказчик', 'Бюджет', 'Дедлайн', 'Релевантность', ''];
+    result = [...result].sort((a, b) => {
+      let aVal: number, bVal: number;
+      if (sortField === 'relevance_score') {
+        aVal = a.relevance_score ?? 0;
+        bVal = b.relevance_score ?? 0;
+      } else if (sortField === 'budget') {
+        aVal = a.budget ?? 0;
+        bVal = b.budget ?? 0;
+      } else {
+        aVal = a.deadline ? new Date(a.deadline).getTime() : 0;
+        bVal = b.deadline ? new Date(b.deadline).getTime() : 0;
+      }
+      return sortAsc ? aVal - bVal : bVal - aVal;
+    });
+
+    return result;
+  }, [tenders, query, minScore, sortField, sortAsc]);
+
+  const headers: { label: string; field?: SortField }[] = [
+    { label: 'Название' },
+    { label: 'Заказчик' },
+    { label: 'Бюджет', field: 'budget' },
+    { label: 'Дедлайн', field: 'deadline' },
+    { label: 'Релевантность', field: 'relevance_score' },
+    { label: 'Причина' },
+    { label: 'Источник' },
+  ];
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) setSortAsc((v) => !v);
+    else { setSortField(field); setSortAsc(false); }
+  };
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#0B0F1A' }}>
       <Sidebar />
       <div style={{ flex: 1, marginLeft: 210 }}>
         <main style={{ padding: '24px 28px' }}>
-          <h1 style={{ fontSize: 22, fontWeight: 500, color: '#F1F5F9', margin: '0 0 4px' }}>Поиск тендеров</h1>
-          <p style={{ fontSize: 12, color: '#64748B', margin: '0 0 20px' }}>
-            Результаты с портала goszakup.gov.kz, отсортированы по релевантности
-          </p>
+          {/* Header */}
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
+            <div>
+              <h1 style={{ fontSize: 22, fontWeight: 500, color: '#F1F5F9', margin: '0 0 4px' }}>Поиск тендеров</h1>
+              <p style={{ fontSize: 12, color: '#64748B', margin: 0 }}>
+                Рекомендованные тендеры, отсортированы по релевантности
+              </p>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {lastUpdated && (
+                <span style={{ fontSize: 11, color: '#475569' }}>
+                  Обновлено: {lastUpdated.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              )}
+              <button
+                onClick={fetchTenders}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  height: 32, padding: '0 12px', fontSize: 12,
+                  color: '#64748B', background: 'transparent',
+                  border: '1px solid #1E293B', borderRadius: 7, cursor: 'pointer',
+                }}
+              >
+                <RefreshCw size={13} />
+                Обновить
+              </button>
+            </div>
+          </div>
 
           {/* Filters */}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
-            <div style={{ position: 'relative', flex: 1, minWidth: 220 }}>
+            <div style={{ position: 'relative', flex: 1, minWidth: 240 }}>
               <Search size={14} color="#64748B" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
               <input
                 type="text"
-                placeholder="Поиск по названию, номеру, заказчику…"
+                placeholder="Поиск по названию, заказчику, источнику…"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 style={{ ...inputStyle, width: '100%', paddingLeft: 32, boxSizing: 'border-box' }}
               />
             </div>
-            <select value={category} onChange={(e) => setCategory(e.target.value)} style={selectStyle}>
-              <option>Все</option>
-              <option>Медоборудование</option>
-              <option>IT-оборудование</option>
-              <option>Строительство</option>
-            </select>
-            <input type="text" placeholder="Бюджет от" value={budgetFrom} onChange={(e) => setBudgetFrom(e.target.value)} style={{ ...inputStyle, width: 110 }} />
-            <input type="text" placeholder="Бюджет до" value={budgetTo} onChange={(e) => setBudgetTo(e.target.value)} style={{ ...inputStyle, width: 110 }} />
-            <select value={region} onChange={(e) => setRegion(e.target.value)} style={selectStyle}>
-              <option>Все регионы</option>
-              <option>Астана</option>
-              <option>Алматы</option>
-              <option>Караганда</option>
-              <option>Шымкент</option>
-              <option>Актау</option>
+            <input
+              type="number"
+              placeholder="Мин. score"
+              value={minScore}
+              min={0}
+              max={100}
+              onChange={(e) => setMinScore(e.target.value)}
+              style={{ ...inputStyle, width: 110 }}
+            />
+            <select
+              value={`${sortField}:${sortAsc ? 'asc' : 'desc'}`}
+              onChange={(e) => {
+                const [f, d] = e.target.value.split(':');
+                setSortField(f as SortField);
+                setSortAsc(d === 'asc');
+              }}
+              style={selectStyle}
+            >
+              <option value="relevance_score:desc">Релевантность ↓</option>
+              <option value="relevance_score:asc">Релевантность ↑</option>
+              <option value="budget:desc">Бюджет ↓</option>
+              <option value="budget:asc">Бюджет ↑</option>
+              <option value="deadline:asc">Дедлайн ↑</option>
+              <option value="deadline:desc">Дедлайн ↓</option>
             </select>
           </div>
 
@@ -133,79 +228,105 @@ export default function TendersSearchPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
-                  {headers.map((h) => (
-                    <th key={h} style={{
-                      textAlign: 'left', fontSize: 10, fontWeight: 500,
-                      color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px',
-                      padding: '10px 14px', borderBottom: '1px solid #1E293B',
-                    }}>{h}</th>
+                  {headers.map(({ label, field }) => (
+                    <th
+                      key={label}
+                      onClick={field ? () => handleSort(field) : undefined}
+                      style={{
+                        textAlign: 'left', fontSize: 10, fontWeight: 500,
+                        color: field && sortField === field ? '#A5B4FC' : '#475569',
+                        textTransform: 'uppercase', letterSpacing: '0.5px',
+                        padding: '10px 14px', borderBottom: '1px solid #1E293B',
+                        cursor: field ? 'pointer' : 'default',
+                        userSelect: 'none',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {label}
+                      {field && sortField === field && (
+                        <span style={{ marginLeft: 4 }}>{sortAsc ? '↑' : '↓'}</span>
+                      )}
+                    </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {filtered.length === 0 && (
-                  <tr><td colSpan={7} style={{ textAlign: 'center', fontSize: 13, color: '#475569', padding: '48px 0' }}>Тендеры не найдены</td></tr>
+                {loading && (
+                  <tr>
+                    <td colSpan={7} style={{ textAlign: 'center', fontSize: 13, color: '#475569', padding: '48px 0' }}>
+                      Загрузка…
+                    </td>
+                  </tr>
                 )}
-                {filtered.map((tender) => {
-                  const highlight = tender.relevance > 70;
+                {!loading && filtered.length === 0 && (
+                  <tr>
+                    <td colSpan={7} style={{ textAlign: 'center', padding: '56px 24px' }}>
+                      {tenders.length === 0 ? (
+                        <div>
+                          <div style={{ fontSize: 15, fontWeight: 500, color: '#CBD5E1', marginBottom: 8 }}>
+                            Тендеры загружаются…
+                          </div>
+                          <div style={{ fontSize: 13, color: '#475569' }}>
+                            Система анализирует новые тендеры каждый час
+                          </div>
+                        </div>
+                      ) : (
+                        <span style={{ fontSize: 13, color: '#475569' }}>По вашему запросу тендеры не найдены</span>
+                      )}
+                    </td>
+                  </tr>
+                )}
+                {!loading && filtered.map((tender) => {
+                  const highlight = tender.relevance_score > 70;
                   return (
                     <tr
                       key={tender.id}
+                      onClick={() => tender.url && window.open(tender.url, '_blank', 'noopener,noreferrer')}
                       style={{
                         background: highlight ? 'rgba(16,185,129,0.04)' : 'transparent',
                         borderBottom: '1px solid rgba(30,41,59,0.6)',
+                        cursor: tender.url ? 'pointer' : 'default',
                         transition: 'background 0.15s',
                       }}
-                      onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = 'rgba(99,102,241,0.04)')}
+                      onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = 'rgba(99,102,241,0.06)')}
                       onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = highlight ? 'rgba(16,185,129,0.04)' : 'transparent')}
                     >
-                      <td style={{ padding: '10px 14px', fontSize: 11, fontFamily: 'monospace', color: '#A5B4FC', whiteSpace: 'nowrap' }}>
-                        {tender.id}
+                      {/* Название */}
+                      <td style={{ padding: '10px 14px', fontSize: 12, color: '#CBD5E1', maxWidth: 280 }}>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+                          <span style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                            {tender.title ?? '—'}
+                          </span>
+                          {tender.url && <ExternalLink size={11} color="#475569" style={{ flexShrink: 0, marginTop: 1 }} />}
+                        </div>
                       </td>
-                      <td style={{ padding: '10px 14px', fontSize: 12, color: '#CBD5E1', maxWidth: 260 }}>
+                      {/* Заказчик */}
+                      <td style={{ padding: '10px 14px', fontSize: 12, color: '#64748B', maxWidth: 180 }}>
                         <span style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                          {tender.name}
+                          {tender.customer ?? '—'}
                         </span>
                       </td>
-                      <td style={{ padding: '10px 14px', fontSize: 12, color: '#64748B', maxWidth: 160 }}>
-                        <span style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                          {tender.customer}
-                        </span>
-                      </td>
+                      {/* Бюджет */}
                       <td style={{ padding: '10px 14px', fontSize: 13, fontWeight: 500, color: '#A5B4FC', whiteSpace: 'nowrap' }}>
-                        {tender.budget}
+                        {formatBudget(tender.budget, tender.currency)}
                       </td>
+                      {/* Дедлайн */}
                       <td style={{ padding: '10px 14px', fontSize: 12, color: '#64748B', whiteSpace: 'nowrap' }}>
-                        {tender.deadline}
+                        {formatDeadline(tender.deadline)}
                       </td>
+                      {/* Релевантность */}
                       <td style={{ padding: '10px 14px' }}>
-                        <RelevanceBar value={tender.relevance} />
+                        <RelevanceBadge value={tender.relevance_score} />
                       </td>
-                      <td style={{ padding: '10px 14px' }}>
-                        <button
-                          onClick={() => router.push(`/tender/new?name=${encodeURIComponent(tender.name)}`)}
-                          style={{
-                            height: 28, padding: '0 10px',
-                            fontSize: 11, fontWeight: 500,
-                            color: '#64748B',
-                            background: 'transparent',
-                            border: '1px solid #1E293B',
-                            borderRadius: 6,
-                            cursor: 'pointer',
-                            whiteSpace: 'nowrap',
-                            transition: 'all 0.15s',
-                          }}
-                          onMouseEnter={(e) => {
-                            (e.currentTarget as HTMLElement).style.borderColor = '#6366F1';
-                            (e.currentTarget as HTMLElement).style.color = '#A5B4FC';
-                          }}
-                          onMouseLeave={(e) => {
-                            (e.currentTarget as HTMLElement).style.borderColor = '#1E293B';
-                            (e.currentTarget as HTMLElement).style.color = '#64748B';
-                          }}
-                        >
-                          Взять в работу
-                        </button>
+                      {/* Причина */}
+                      <td style={{ padding: '10px 14px', fontSize: 11, color: '#64748B', maxWidth: 200 }}>
+                        <span style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                          {tender.relevance_reason ?? '—'}
+                        </span>
+                      </td>
+                      {/* Источник */}
+                      <td style={{ padding: '10px 14px', fontSize: 11, color: '#475569', whiteSpace: 'nowrap' }}>
+                        {tender.source ?? '—'}
                       </td>
                     </tr>
                   );
@@ -213,8 +334,9 @@ export default function TendersSearchPage() {
               </tbody>
             </table>
           </div>
+
           <div style={{ marginTop: 10, fontSize: 12, color: '#475569' }}>
-            Показано {filtered.length} из {TENDERS.length} тендеров
+            {!loading && `Показано ${filtered.length} из ${tenders.length} тендеров`}
           </div>
         </main>
       </div>
