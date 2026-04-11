@@ -69,22 +69,27 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  // 2. Fire trigger with file_url — n8n handles the download
+  // 2. Fire n8n webhook directly — n8n handles the file download
   const fileUrl = documents_url ? parseFirstUrl(documents_url) : null
-  try {
-    const origin = request.nextUrl.origin
-    await fetch(`${origin}/api/tender/trigger`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        tender_id: tender.id,
-        user_id,
-        file_url: fileUrl ?? '',
-      }),
-    })
-  } catch (e) {
-    // Non-fatal: tender was created, processing page will show the status
-    console.error('[take] Trigger error:', e)
+  const webhookUrl = process.env.N8N_WEBHOOK_URL
+  if (webhookUrl) {
+    try {
+      const webhookRes = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tenderId: tender.id,
+          userId: user_id,
+          fileUrl: fileUrl ?? '',
+        }),
+      })
+      console.log('[take] n8n webhook response:', webhookRes.status)
+    } catch (e) {
+      // Non-fatal: tender was created, processing page will show the status
+      console.error('[take] n8n webhook error:', e)
+    }
+  } else {
+    console.error('[take] N8N_WEBHOOK_URL is not set')
   }
 
   return NextResponse.json({ tender_id: tender.id })
