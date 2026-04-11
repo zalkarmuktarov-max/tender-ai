@@ -158,6 +158,12 @@ export default function TendersSearchPage() {
   const handleTakeWork = useCallback(async (tender: RecommendedTender, e: React.MouseEvent) => {
     e.stopPropagation();
 
+    // No documents_url — open ProZorro page instead
+    if (!tender.documents_url) {
+      if (tender.url) window.open(tender.url, '_blank', 'noopener,noreferrer');
+      return;
+    }
+
     setTakingWork((prev) => ({ ...prev, [tender.id]: true }));
 
     try {
@@ -180,9 +186,7 @@ export default function TendersSearchPage() {
       const data = await res.json();
       if (!res.ok || !data.tender_id) throw new Error(data.error ?? 'Unknown error');
 
-      const params = new URLSearchParams({ id: data.tender_id, uid: user.id });
-      if (data.file_path) params.set('file', data.file_path);
-      router.push(`/tender/processing?${params.toString()}`);
+      router.push(`/tender/processing/${data.tender_id}`);
     } catch (err) {
       console.error('[takeWork]', err);
       alert('Ошибка при взятии тендера в работу');
@@ -376,9 +380,9 @@ export default function TendersSearchPage() {
                           const isLoading = !!takingWork[tender.id];
                           return (
                             <button
-                              onClick={(e) => hasDoc && !isLoading ? handleTakeWork(tender, e) : e.stopPropagation()}
-                              disabled={!hasDoc || isLoading}
-                              title={!hasDoc ? 'Нет документов' : undefined}
+                              onClick={(e) => !isLoading ? handleTakeWork(tender, e) : e.stopPropagation()}
+                              disabled={isLoading}
+                              title={!hasDoc ? 'Нет документов — откроет ProZorro' : undefined}
                               style={{
                                 display: 'inline-flex',
                                 alignItems: 'center',
@@ -389,11 +393,13 @@ export default function TendersSearchPage() {
                                 fontWeight: 500,
                                 border: 'none',
                                 borderRadius: 6,
-                                cursor: (!hasDoc || isLoading) ? 'not-allowed' : 'pointer',
-                                background: (!hasDoc || isLoading)
+                                cursor: isLoading ? 'not-allowed' : 'pointer',
+                                background: isLoading
                                   ? 'rgba(30,41,59,0.6)'
-                                  : 'linear-gradient(135deg, #6366F1, #7C3AED)',
-                                color: (!hasDoc || isLoading) ? '#475569' : '#ffffff',
+                                  : hasDoc
+                                    ? 'linear-gradient(135deg, #6366F1, #7C3AED)'
+                                    : 'rgba(30,41,59,0.8)',
+                                color: isLoading ? '#475569' : '#CBD5E1',
                                 transition: 'opacity 0.15s',
                                 opacity: isLoading ? 0.7 : 1,
                                 flexShrink: 0,
@@ -401,7 +407,7 @@ export default function TendersSearchPage() {
                             >
                               {isLoading
                                 ? <><Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} />Загрузка…</>
-                                : 'Взять в работу'
+                                : hasDoc ? 'Взять в работу' : 'Открыть ProZorro'
                               }
                             </button>
                           );
