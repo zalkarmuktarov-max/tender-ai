@@ -1,6 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
+/**
+ * Detect MIME type and file extension from the first bytes of the file.
+ * ProZorro (and similar portals) often return text/plain regardless of the actual format.
+ */
+function sniffFileType(bytes: Uint8Array): { contentType: string; ext: string } {
+  // PDF: %PDF
+  if (bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46) {
+    return { contentType: 'application/pdf', ext: 'pdf' }
+  }
+  // ZIP-based (DOCX, XLSX, ODT…): PK\x03\x04
+  if (bytes[0] === 0x50 && bytes[1] === 0x4b && bytes[2] === 0x03 && bytes[3] === 0x04) {
+    return { contentType: 'application/zip', ext: 'zip' }
+  }
+  // Compound Document (DOC, XLS): D0 CF 11 E0
+  if (bytes[0] === 0xd0 && bytes[1] === 0xcf && bytes[2] === 0x11 && bytes[3] === 0xe0) {
+    return { contentType: 'application/msword', ext: 'doc' }
+  }
+  return { contentType: 'application/octet-stream', ext: 'bin' }
+}
+
 function parseFirstUrl(documentsUrl: string): string | null {
   const trimmed = documentsUrl.trim()
   if (!trimmed) return null
@@ -59,16 +79,23 @@ export async function POST(request: NextRequest) {
       }
 
       const buffer = await response.arrayBuffer()
-      const contentType = response.headers.get('content-type') ?? 'application/octet-stream'
 
-      // Derive a filename from the URL
-      let fileName = 'document.pdf'
+      // Sniff actual file type from magic bytes — don't trust server headers
+      // (ProZorro returns text/plain even for real PDF files)
+      const { contentType, ext } = sniffFileType(new Uint8Array(buffer))
+
+      // Derive a base filename from the URL path, strip any wrong extension
+      let baseName = 'document'
       try {
         const urlPath = new URL(fileUrl).pathname
         const part = urlPath.split('/').pop()
-        if (part) fileName = decodeURIComponent(part)
+        if (part) {
+          // Strip existing extension so we can append the sniffed one
+          baseName = decodeURIComponent(part).replace(/\.[^.]+$/, '') || baseName
+        }
       } catch {}
 
+      const fileName = `${baseName}.${ext}`
       filePath = `${user_id}/${Date.now()}-${fileName}`
 
       // 3. Upload to Supabase Storage (service role bypasses RLS)
