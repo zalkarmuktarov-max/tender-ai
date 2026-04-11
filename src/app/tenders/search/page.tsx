@@ -1,8 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
-import { Search, RefreshCw, ExternalLink, Loader2 } from 'lucide-react';
+import { Search, RefreshCw, ExternalLink } from 'lucide-react';
 import { Sidebar } from '@/components/Sidebar';
 import { createClient } from '@/lib/supabase/client';
 
@@ -19,7 +18,6 @@ interface RecommendedTender {
   relevance_reason: string | null;
   source: string | null;
   url: string | null;
-  documents_url: string | null;
 }
 
 type SortField = 'relevance_score' | 'budget' | 'deadline';
@@ -80,11 +78,9 @@ function formatDeadline(deadline: string | null) {
 }
 
 export default function TendersSearchPage() {
-  const router = useRouter();
   const [tenders, setTenders] = useState<RecommendedTender[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [takingWork, setTakingWork] = useState<Record<string, boolean>>({});
 
   const [query, setQuery] = useState('');
   const [minScore, setMinScore] = useState('');
@@ -147,7 +143,6 @@ export default function TendersSearchPage() {
     { label: 'Релевантность', field: 'relevance_score' },
     { label: 'Причина' },
     { label: 'Источник' },
-    { label: 'Действие' },
   ];
 
   const handleSort = (field: SortField) => {
@@ -155,48 +150,8 @@ export default function TendersSearchPage() {
     else { setSortField(field); setSortAsc(false); }
   };
 
-  const handleTakeWork = useCallback(async (tender: RecommendedTender, e: React.MouseEvent) => {
-    e.stopPropagation();
-
-    // No documents_url — open ProZorro page instead
-    if (!tender.documents_url) {
-      if (tender.url) window.open(tender.url, '_blank', 'noopener,noreferrer');
-      return;
-    }
-
-    setTakingWork((prev) => ({ ...prev, [tender.id]: true }));
-
-    try {
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      if (authError || !user) { router.push('/login'); return; }
-
-      const res = await fetch('/api/tender/take', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          documents_url: tender.documents_url,
-          title: tender.title,
-          customer: tender.customer,
-          budget: tender.budget,
-          deadline: tender.deadline,
-          user_id: user.id,
-        }),
-      });
-
-      const data = await res.json();
-      if (!res.ok || !data.tender_id) throw new Error(data.error ?? 'Unknown error');
-
-      router.push(`/tender/processing/${data.tender_id}`);
-    } catch (err) {
-      console.error('[takeWork]', err);
-      alert('Ошибка при взятии тендера в работу');
-      setTakingWork((prev) => ({ ...prev, [tender.id]: false }));
-    }
-  }, [router]);
-
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#0B0F1A' }}>
-      <style>{`@keyframes spin { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }`}</style>
       <Sidebar />
       <div style={{ flex: 1, marginLeft: 210 }}>
         <main style={{ padding: '24px 28px' }}>
@@ -298,14 +253,14 @@ export default function TendersSearchPage() {
               <tbody>
                 {loading && (
                   <tr>
-                    <td colSpan={8} style={{ textAlign: 'center', fontSize: 13, color: '#475569', padding: '48px 0' }}>
+                    <td colSpan={7} style={{ textAlign: 'center', fontSize: 13, color: '#475569', padding: '48px 0' }}>
                       Загрузка…
                     </td>
                   </tr>
                 )}
                 {!loading && filtered.length === 0 && (
                   <tr>
-                    <td colSpan={8} style={{ textAlign: 'center', padding: '56px 24px' }}>
+                    <td colSpan={7} style={{ textAlign: 'center', padding: '56px 24px' }}>
                       {tenders.length === 0 ? (
                         <div>
                           <div style={{ fontSize: 15, fontWeight: 500, color: '#CBD5E1', marginBottom: 8 }}>
@@ -372,46 +327,6 @@ export default function TendersSearchPage() {
                       {/* Источник */}
                       <td style={{ padding: '10px 14px', fontSize: 11, color: '#475569', whiteSpace: 'nowrap' }}>
                         {tender.source ?? '—'}
-                      </td>
-                      {/* Действие */}
-                      <td style={{ padding: '8px 14px', whiteSpace: 'nowrap' }}>
-                        {(() => {
-                          const hasDoc = !!tender.documents_url;
-                          const isLoading = !!takingWork[tender.id];
-                          return (
-                            <button
-                              onClick={(e) => !isLoading ? handleTakeWork(tender, e) : e.stopPropagation()}
-                              disabled={isLoading}
-                              title={!hasDoc ? 'Нет документов — откроет ProZorro' : undefined}
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: 5,
-                                height: 28,
-                                padding: '0 10px',
-                                fontSize: 11,
-                                fontWeight: 500,
-                                border: 'none',
-                                borderRadius: 6,
-                                cursor: isLoading ? 'not-allowed' : 'pointer',
-                                background: isLoading
-                                  ? 'rgba(30,41,59,0.6)'
-                                  : hasDoc
-                                    ? 'linear-gradient(135deg, #6366F1, #7C3AED)'
-                                    : 'rgba(30,41,59,0.8)',
-                                color: isLoading ? '#475569' : '#CBD5E1',
-                                transition: 'opacity 0.15s',
-                                opacity: isLoading ? 0.7 : 1,
-                                flexShrink: 0,
-                              }}
-                            >
-                              {isLoading
-                                ? <><Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} />Загрузка…</>
-                                : hasDoc ? 'Взять в работу' : 'Открыть ProZorro'
-                              }
-                            </button>
-                          );
-                        })()}
                       </td>
                     </tr>
                   );
